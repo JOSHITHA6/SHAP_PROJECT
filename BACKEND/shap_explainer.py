@@ -1,25 +1,18 @@
 import shap
 import matplotlib.pyplot as plt
 
-def explain_model(model, X, model_type):
+def generate_shap_plots(model, X_sample):
 
-    # 🔥 TAKE SMALL SAMPLE (IMPORTANT)
-    X_sample = X[:50]
+    # Universal SHAP (works for all models)
+    explainer = shap.Explainer(model, X_sample)
+    shap_values = explainer(X_sample)
 
-    if model_type in ["Random Forest", "XGBoost"]:
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(X_sample)
+    # -------- GLOBAL (Beeswarm / Violin-like) --------
+    fig_global, ax1 = plt.subplots()
+    shap.plots.beeswarm(shap_values, show=False)
 
-    elif model_type in ["Linear Regression", "Logistic Regression"]:
-        explainer = shap.LinearExplainer(model, X_sample)
-        shap_values = explainer.shap_values(X_sample)
+    # -------- LOCAL (Waterfall) --------
+    fig_local, ax2 = plt.subplots()
+    shap.plots.waterfall(shap_values[0], show=False)
 
-    else:
-        explainer = shap.KernelExplainer(model.predict, X_sample)
-        shap_values = explainer.shap_values(X_sample)
-
-    # Plot
-    fig, ax = plt.subplots()
-    shap.summary_plot(shap_values, X_sample, show=False)
-
-    return fig
+    return fig_global, fig_local
