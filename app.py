@@ -6,69 +6,117 @@ st.set_page_config(layout="wide")
 # ---------- CSS ----------
 st.markdown("""
 <style>
+
+/* Page width */
 .block-container {
-    max-width: 800px;
+    max-width: 1100px;
     margin: auto;
 }
+
+/* Neon card style */
 .card {
-    background-color: white;
+    background: white;
     padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0px 4px 12px rgba(0,0,0,0.08);
+    border-radius: 14px;
+    box-shadow: 0px 0px 15px rgba(0, 123, 255, 0.3);
 }
+
+/* Section titles */
+.section-title {
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #2c3e50;
+}
+
+/* Blue theme inputs */
+.stSelectbox, .stRadio {
+    border-radius: 8px;
+}
+
+/* Run button (green) */
 .stButton>button {
     width: 100%;
     height: 45px;
     border-radius: 8px;
-    background-color: #4a7cff;
+    background-color: #28a745;
     color: white;
     font-size: 16px;
+    font-weight: bold;
 }
+
+/* Output box */
+.output-box {
+    background-color: #f4f8ff;
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid #d0e3ff;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
 # ---------- TITLE ----------
 st.markdown("<h1 style='text-align:center;'>SHAP Explainability Tool</h1>", unsafe_allow_html=True)
 
-# ---------- CARD ----------
-st.markdown('<div class="card">', unsafe_allow_html=True)
+# ---------- LAYOUT ----------
+col1, col2 = st.columns(2)
 
-# ---------- FORM ----------
-with st.form("shap_form"):
+# ---------- LEFT: INPUT ----------
+with col1:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    st.subheader("Upload CSV")
-    file = st.file_uploader("", type=["csv"])
+    st.markdown('<div class="section-title">CONFIGURE SHAP</div>', unsafe_allow_html=True)
 
-    st.subheader("Dataset Preview")
+    file = st.file_uploader("Upload Dataset", type=["csv"])
+
     df = None
     if file is not None:
         df = pd.read_csv(file)
+        st.success("Dataset Loaded")
         st.dataframe(df.head())
-    else:
-        st.info("Please upload a dataset to get started.")
 
-    st.subheader("Select Target Column")
+    st.markdown("Select Target Column")
     if df is not None:
         target = st.selectbox("", df.columns)
     else:
         target = st.selectbox("", ["Upload dataset first"], disabled=True)
 
-    st.subheader("Select Task")
+    st.markdown("Select Task")
     task = st.radio("", ["Classification", "Regression"])
 
-    st.subheader("Select Model")
+    st.markdown("Select Model")
     if task == "Classification":
         model = st.selectbox("", ["Random Forest", "Logistic Regression", "SVM", "XGBoost"])
     else:
         model = st.selectbox("", ["Linear Regression", "Random Forest", "SVR", "XGBoost"])
 
-    run = st.form_submit_button("Run Model")
+    run = st.button("Run Model")
 
-st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# ---------- RUN LOGIC ----------
-if run:
-    if file is None:
-        st.warning("Please upload a dataset first")
+
+# ---------- RIGHT: OUTPUT ----------
+with col2:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    st.markdown('<div class="section-title">OUTPUT SCREEN</div>', unsafe_allow_html=True)
+
+    if run and file is not None:
+        st.success("Model executed successfully!")
+
+        st.markdown('<div class="output-box">', unsafe_allow_html=True)
+        st.write("Prediction will appear here")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        tab1, tab2 = st.tabs(["Local Explainability", "Global Explainability"])
+
+        with tab1:
+            st.write("Local SHAP explanation will appear here")
+
+        with tab2:
+            st.write("Global SHAP explanation will appear here")
+
     else:
-        st.success("Running model...")
+        st.info("Run the model to see results")
+
+    st.markdown('</div>', unsafe_allow_html=True)
