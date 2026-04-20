@@ -8,26 +8,38 @@ import pandas as pd
 
 st.markdown("""
 <style>
-.main {
-    background-color: #f5f7fa;
+
+/* Center main container */
+.block-container {
+    max-width: 700px;
+    margin: auto;
 }
-h1 {
-    text-align: center;
-    color: #2c3e50;
+
+/* Card box */
+.custom-box {
+    background-color: #ffffff;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0px 4px 15px rgba(0,0,0,0.08);
 }
-.stButton>button {
-    background-color: #4CAF50;
-    color: white;
-    border-radius: 10px;
-    height: 45px;
-    width: 100%;
-    font-size: 16px;
-}
+
+/* Upload box styling */
 .stFileUploader {
-    background-color: white;
+    background-color: #f1f3f6;
     padding: 15px;
     border-radius: 10px;
 }
+
+/* Info message full width */
+.full-width {
+    width: 100%;
+}
+
+/* Title center */
+h1 {
+    text-align: center;
+}
+
 </style>
 """, unsafe_allow_html=True)
 from BACKEND.model import train_model
