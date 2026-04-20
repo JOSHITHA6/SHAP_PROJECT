@@ -69,7 +69,7 @@ with col2:
 
         scaler = StandardScaler()
         X_train = scaler.fit_transform(X_train)
-        X_test = scaler.transform(X_test)
+        X_test = pd.DataFrame(scaler.transform(X_test), columns=X.columns)
 
         # -------- MODEL --------
         if model_type == "Logistic Regression":
