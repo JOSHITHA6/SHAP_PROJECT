@@ -16,7 +16,7 @@ file = st.file_uploader("Upload CSV", type=["csv"])
 if file is not None:
     df = pd.read_csv(file)
 
-    st.write("Dataset Preview:")
+    st.success("Dataset Preview:")
     st.dataframe(df.head())
 
     target = st.selectbox("Select Target Column", df.columns)
@@ -36,3 +36,5 @@ if file is not None:
 
     if st.button("Run Model"):
         st.write("Running model...")
+else:
+    st.info("Please upload a dataset to get started.")
