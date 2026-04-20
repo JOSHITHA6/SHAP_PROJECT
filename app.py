@@ -1,3 +1,27 @@
+st.markdown("""
+<style>
+.main {
+    background-color: #f5f7fa;
+}
+h1 {
+    text-align: center;
+    color: #2c3e50;
+}
+.stButton>button {
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 10px;
+    height: 45px;
+    width: 100%;
+    font-size: 16px;
+}
+.stFileUploader {
+    background-color: white;
+    padding: 15px;
+    border-radius: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
 import sys
 import os
 
