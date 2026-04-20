@@ -32,20 +32,21 @@ A Streamlit-based web application to explain machine learning model predictions 
 ---
 
 ## 📂 Project Structure
-shap-streamlit-app/
-│
+
+```
+SHAP_PROJECT/
+
 ├── app.py
 ├── requirements.txt
 ├── README.md
-│
-├── backend/
-│ ├── model.py
-│ ├── shap_explainer.py
-│
-├── utils/
-│ ├── preprocess.py
 
----
+├── backend/
+│   ├── model.py
+│   ├── shap_explainer.py
+
+├── utils/
+│   ├── preprocess.py
+```
 
 ## ▶️ How to Run
 
