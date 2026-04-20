@@ -1,125 +1,129 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 
-# ---------- PAGE CONFIG ----------
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+
+import shap
+import matplotlib.pyplot as plt
+
+# ====================================================
+# PAGE CONFIG
+# ====================================================
 st.set_page_config(layout="wide")
+st.title("📊 SHAP Explainability Tool")
 
-# ---------- CSS ----------
-st.markdown("""
-<style>
+# ====================================================
+# SESSION STATE
+# ====================================================
+if "trained" not in st.session_state:
+    st.session_state.trained = False
 
-/* Center content */
-.block-container {
-    max-width: 1100px;
-    margin: auto;
-}
+# ====================================================
+# LAYOUT
+# ====================================================
+col1, col2 = st.columns([1,1])
 
-/* Outer neon box */
-.outer-box {
-    padding: 30px;
-    border-radius: 16px;
-    background-color: white;
-    box-shadow: 0 0 25px rgba(0, 123, 255, 0.5);
-}
+# ====================================================
+# LEFT SIDE (INPUT)
+# ====================================================
+with col1:
+    st.subheader("⚙️ Configure SHAP")
 
-/* Section titles */
-.section-title {
-    font-weight: 600;
-    color: #2c3e50;
-    margin-bottom: 10px;
-}
+    uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
 
-/* Divider */
-.divider {
-    border-left: 2px solid #e0e6f0;
-    height: 100%;
-}
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
+        st.write(df.head())
 
-/* Run button */
-.stButton>button {
-    background-color: #28a745;
-    color: white;
-    border-radius: 8px;
-    height: 45px;
-    width: 100%;
-    font-size: 16px;
-}
+        target = st.selectbox("Select Target Column", df.columns)
 
-/* Output box */
-.output-box {
-    background-color: #f4f8ff;
-    padding: 15px;
-    border-radius: 10px;
-    border: 1px solid #d0e3ff;
-}
+    task = st.radio("Task", ["Classification", "Regression"])
 
-</style>
-""", unsafe_allow_html=True)
+    model_type = st.selectbox("Model", ["Logistic Regression", "Random Forest"])
 
-# ---------- TITLE ----------
-st.markdown("<h1 style='text-align:center;'>SHAP Explainability Tool</h1>", unsafe_allow_html=True)
+    run = st.button("🚀 Run Model")
 
-# ---------- OUTER BOX ----------
-container = st.container()
 
-with container:
-    st.markdown('<div class="outer-box">', unsafe_allow_html=True)
+# ====================================================
+# RIGHT SIDE (OUTPUT)
+# ====================================================
+with col2:
+    st.subheader("📊 Output Screen")
 
-    col1, col_mid, col2 = st.columns([1, 0.05, 1])
+    if run and uploaded_file:
 
-    # ---------- LEFT SIDE ----------
-    with col1:
-        st.markdown('<div class="section-title">CONFIGURE SHAP</div>', unsafe_allow_html=True)
+        # -------- PREPROCESS --------
+        df = pd.get_dummies(df, drop_first=True)
 
-        file = st.file_uploader("Upload Dataset", type=["csv"])
+        X = df.drop(columns=[target])
+        y = df[target]
 
-        df = None
-        if file is not None:
-            df = pd.read_csv(file)
-            st.success("Dataset Loaded")
-            st.dataframe(df.head())
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.3, random_state=42
+        )
 
-        st.markdown("Select Target Column")
-        if df is not None:
-            target = st.selectbox("", df.columns)
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X_train)
+        X_test = scaler.transform(X_test)
+
+        # -------- MODEL --------
+        if model_type == "Logistic Regression":
+            model = LogisticRegression(max_iter=2000)
         else:
-            st.selectbox("", ["Upload dataset first"], disabled=True)
+            model = RandomForestClassifier()
 
-        st.markdown("Select Task")
-        task = st.radio("", ["Classification", "Regression"])
+        model.fit(X_train, y_train)
 
-        st.markdown("Select Model")
-        if task == "Classification":
-            model = st.selectbox("", ["Random Forest", "Logistic Regression", "SVM", "XGBoost"])
-        else:
-            model = st.selectbox("", ["Linear Regression", "Random Forest", "SVR", "XGBoost"])
+        y_pred = model.predict(X_test)
+        acc = accuracy_score(y_test, y_pred)
 
-        run = st.button("Run Model")
+        st.success("✅ Model Trained Successfully")
+        st.write(f"Accuracy: {round(acc*100,2)}%")
 
-    # ---------- DIVIDER ----------
-    with col_mid:
-        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+        # ====================================================
+        # SHAP (FAST VERSION 🔥)
+        # ====================================================
+        st.markdown("### 🔍 SHAP Explanation")
 
-    # ---------- RIGHT SIDE ----------
-    with col2:
-        st.markdown('<div class="section-title">OUTPUT SCREEN</div>', unsafe_allow_html=True)
+        # ⚡ Take small sample to avoid lag
+        X_sample = X_test[:50]
 
-        if run and file is not None:
-            st.success("Model executed successfully!")
+        try:
+            if model_type == "Random Forest":
+                explainer = shap.TreeExplainer(model)
+                shap_values = explainer.shap_values(X_sample)
 
-            st.markdown('<div class="output-box">', unsafe_allow_html=True)
-            st.write("Prediction will appear here")
-            st.markdown('</div>', unsafe_allow_html=True)
+            else:
+                explainer = shap.LinearExplainer(model, X_sample)
+                shap_values = explainer.shap_values(X_sample)
 
-            tab1, tab2 = st.tabs(["Local Explainability", "Global Explainability"])
+            # -------- GLOBAL EXPLANATION --------
+            st.markdown("#### 🌍 Global Explanation")
 
-            with tab1:
-                st.write("Local SHAP explanation here")
+            fig, ax = plt.subplots()
+            shap.summary_plot(shap_values, X_sample, show=False)
+            st.pyplot(fig)
 
-            with tab2:
-                st.write("Global SHAP explanation here")
+            # -------- LOCAL EXPLANATION --------
+            st.markdown("#### 🔍 Local Explanation")
 
-        else:
-            st.info("Run the model to see results")
+            fig2, ax2 = plt.subplots()
+            shap.plots.waterfall(shap.Explanation(
+                values=shap_values[0],
+                base_values=explainer.expected_value,
+                data=X_sample[0]
+            ), show=False)
 
-    st.markdown('</div>', unsafe_allow_html=True)
+            st.pyplot(fig2)
+
+        except Exception as e:
+            st.error("SHAP failed (try smaller dataset)")
+            st.write(e)
+
+    else:
+        st.info("Run the model to see results")
