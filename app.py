@@ -1,3 +1,11 @@
+
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+import streamlit as st
+import pandas as pd
+
 st.markdown("""
 <style>
 .main {
@@ -22,13 +30,6 @@ h1 {
 }
 </style>
 """, unsafe_allow_html=True)
-import sys
-import os
-
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-import streamlit as st
-import pandas as pd
-
 from BACKEND.model import train_model
 from BACKEND.shap_explainer import explain_model
 
