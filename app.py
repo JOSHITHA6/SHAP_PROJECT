@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-from backend.model import train_model
-from backend.shap_explainer import generate_shap_plots
+from BACKEND.model import train_model
+from BACKEND.shap_explainer import generate_shap_plots
 from utils.preprocess import preprocess_data
 
 from sklearn.metrics import accuracy_score, r2_score
