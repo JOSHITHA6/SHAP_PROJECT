@@ -2,63 +2,39 @@ import streamlit as st
 import pandas as pd
 
 from backend.model import train_model
-from backend.shap_explainer import get_shap_values
+from backend.shap_explainer import explain_model
 
-st.set_page_config(layout="wide")
+st.title("SHAP Explainability Tool")
 
-# Title
-st.title("SHAP – Explains ML Models")
-st.caption("Explain machine learning model predictions using SHapley values")
+# Upload dataset
+file = st.file_uploader("Upload CSV", type=["csv"])
 
-# Layout
-col1, col2 = st.columns(2)
+if file:
+    df = pd.read_csv(file)
 
-# ---------------- LEFT SIDE ---------------- #
-with col1:
-    st.subheader("CONFIGURE SHAP")
+    # Select target column
+    target = st.selectbox("Select Target Column", df.columns)
 
-    # Upload Dataset
-    uploaded_file = st.file_uploader("Upload Dataset")
+    # Select task
+    task = st.radio("Select Task", ["Classification", "Regression"])
 
-    # Task selection
-    task = st.radio("Select Your Task", ["Classification", "Regression"])
+    # Dynamic model selection
+    if task == "Classification":
+        model_type = st.selectbox(
+            "Select Model",
+            ["Logistic Regression", "Random Forest", "SVM", "XGBoost"]
+        )
+    else:
+        model_type = st.selectbox(
+            "Select Model",
+            ["Linear Regression", "Random Forest", "SVR", "XGBoost"]
+        )
 
-    # Model selection
-    model_type = st.selectbox(
-        "Select Model Type",
-        ["Random Forest", "XGBoost", "Logistic Regression", "SVM", "Linear Regression"]
-    )
+    if st.button("Run Model"):
+        model, X_test = train_model(df, target, task, model_type)
 
-    run_button = st.button("Run")
+        st.success("Model trained successfully!")
 
-# ---------------- RIGHT SIDE ---------------- #
-with col2:
-    st.subheader("OUTPUT SCREEN")
+        fig = explain_model(model, X_test, model_type)
 
-    st.markdown("### OUTPUT PREDICTION")
-    prediction_placeholder = st.empty()
-
-    tab1, tab2 = st.tabs(["Local Explainability", "Global Explainability"])
-
-    with tab1:
-        local_placeholder = st.empty()
-
-    with tab2:
-        global_placeholder = st.empty()
-
-
-# ---------------- LOGIC ---------------- #
-if run_button and uploaded_file is not None:
-    df = pd.read_csv(uploaded_file)
-
-    model, X_test = train_model(df, task, model_type)
-
-    prediction_placeholder.success("Model trained successfully!")
-
-    shap_values, plot = get_shap_values(model, X_test, task)
-
-    with tab1:
-        st.pyplot(plot)
-
-    with tab2:
-        st.write("Global explanation coming soon...")
+        st.pyplot(fig)
