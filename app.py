@@ -1,28 +1,28 @@
 import sys
 import os
 
-sys.path.append(os.path.abspath("."))
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import streamlit as st
 import pandas as pd
 
-from backend.model import train_model
-from backend.shap_explainer import explain_model
+from BACKEND.model import train_model
+from BACKEND.shap_explainer import explain_model
 
 st.title("SHAP Explainability Tool")
 
 # Upload dataset
 file = st.file_uploader("Upload CSV", type=["csv"])
 
-if file:
+if file is not None:
     df = pd.read_csv(file)
 
-    # Select target column
+    st.write("Dataset Preview:")
+    st.dataframe(df.head())
+
     target = st.selectbox("Select Target Column", df.columns)
 
-    # Select task
     task = st.radio("Select Task", ["Classification", "Regression"])
 
-    # Dynamic model selection
     if task == "Classification":
         model_type = st.selectbox(
             "Select Model",
@@ -35,10 +35,4 @@ if file:
         )
 
     if st.button("Run Model"):
-        model, X_test = train_model(df, target, task, model_type)
-
-        st.success("Model trained successfully!")
-
-        fig = explain_model(model, X_test, model_type)
-
-        st.pyplot(fig)
+        st.write("Running model...")
