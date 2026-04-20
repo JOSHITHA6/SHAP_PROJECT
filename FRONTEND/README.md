@@ -50,41 +50,42 @@ SHAP_PROJECT/
 
 ## ▶️ How to Run
 
-1. Clone the repository:
+### 1. Clone the repository:
 
 ```bash
 git clone https://github.com/JOSHITHA6/SHAP_PROJECT.git
 cd SHAP_PROJECT
-Install dependencies:
+```
+
+### 2.Install dependencies:
+```bash
 pip install -r requirements.txt
-Run the app:
+```
+
+### 3.Run the app:
+```bash
 streamlit run app.py
-📊 Example Workflow
-Upload dataset
-Select task (Classification/Regression)
-Choose model
-Click "Run"
-View SHAP explanations
-📌 Future Improvements
-Add more ML models (LightGBM, CatBoost)
-Improve UI design
-Add downloadable reports
-Deploy online (Streamlit Cloud)
-👩‍💻 Author
+```
+
+### 📊 Example Workflow
+
+- Upload dataset
+- Select task (Classification/Regression)
+- Choose model
+- Click "Run"
+- View SHAP explanations
+---
+
+## 📌 Future Improvements
+- Add more ML models (LightGBM, CatBoost)
+- Improve UI design
+- Add downloadable reports
+- Deploy online (Streamlit Cloud)
+---
+
+## 👩‍💻 Author
 
 Palavalasa Sai Joshitha
 Final Year Engineering Student
 AI/ML & Data Science Enthusiast
-
-
 ---
-
-# 🔥 Small but IMPORTANT edits you must do
-
-👉 Replace:
-
-``` id="1m3hlq"
-your-username
-your-repo-name
-
-with your actual GitHub details.
