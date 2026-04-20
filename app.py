@@ -72,6 +72,10 @@ if file is not None:
         )
 
     if st.button("Run Model"):
-        st.write("Running model...")
+        with st.spinner("Training model and generating SHAP explanations..."):
+            model = train_model(df, target, model_type)
+            fig = explain_model(model, df.drop(columns=[target]), model_type)
+        st.pyplot(fig)
+       
 else:
     st.info("Please upload a dataset to get started.")
