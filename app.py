@@ -26,7 +26,7 @@ with col1:
     # Model selection
     model_type = st.selectbox(
         "Select Model Type",
-        ["Random Forest", "XGBoost", "Logistic Regression", "SVM"]
+        ["Random Forest", "XGBoost", "Logistic Regression", "SVM", "Linear Regression"]
     )
 
     run_button = st.button("Run")
