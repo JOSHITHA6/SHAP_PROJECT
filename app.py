@@ -26,7 +26,7 @@ if "trained" not in st.session_state:
 # ====================================================
 # LAYOUT
 # ====================================================
-col1, col2 = st.columns([1,1])
+col1, col2 = st.columns([1, 1])
 
 # ====================================================
 # LEFT SIDE (INPUT)
@@ -57,72 +57,85 @@ with col2:
 
     if run and uploaded_file:
 
-        # -------- PREPROCESS --------
-        df = pd.get_dummies(df, drop_first=True)
+        with st.spinner("Running model... please wait ⏳"):
 
-        X = df.drop(columns=[target])
-        y = df[target]
+            # -------- PREPROCESS --------
+            df = pd.get_dummies(df, drop_first=True)
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.3, random_state=42
-        )
+            X = df.drop(columns=[target])
+            y = df[target]
 
-        scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train)
-        X_test = pd.DataFrame(scaler.transform(X_test), columns=X.columns)
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.3, random_state=42
+            )
 
-        # -------- MODEL --------
-        if model_type == "Logistic Regression":
-            model = LogisticRegression(max_iter=2000)
-        else:
-            model = RandomForestClassifier()
+            scaler = StandardScaler()
+            X_train = scaler.fit_transform(X_train)
 
-        model.fit(X_train, y_train)
+            # 🔥 IMPORTANT FIX (convert back to DataFrame)
+            X_test = pd.DataFrame(
+                scaler.transform(X_test),
+                columns=X.columns
+            )
 
-        y_pred = model.predict(X_test)
-        acc = accuracy_score(y_test, y_pred)
+            # -------- MODEL --------
+            if model_type == "Logistic Regression":
+                model = LogisticRegression(max_iter=2000)
+            else:
+                model = RandomForestClassifier(n_estimators=100)
+
+            model.fit(X_train, y_train)
+
+            y_pred = model.predict(X_test)
+            acc = accuracy_score(y_test, y_pred)
 
         st.success("✅ Model Trained Successfully")
         st.write(f"Accuracy: {round(acc*100,2)}%")
 
         # ====================================================
-        # SHAP (FAST VERSION 🔥)
+        # 🔥 FAST SHAP (NO LAG VERSION)
         # ====================================================
         st.markdown("### 🔍 SHAP Explanation")
 
-        # ⚡ Take small sample to avoid lag
-        X_sample = X_test[:50]
+        # ⚡ TAKE SMALL SAMPLE → FAST EXECUTION
+        X_sample = X_test.iloc[:30]
 
         try:
             if model_type == "Random Forest":
                 explainer = shap.TreeExplainer(model)
                 shap_values = explainer.shap_values(X_sample)
 
+                # 🔥 FIX FOR CLASSIFICATION
+                if isinstance(shap_values, list):
+                    shap_values = shap_values[1]
+
             else:
                 explainer = shap.LinearExplainer(model, X_sample)
                 shap_values = explainer.shap_values(X_sample)
 
-            # -------- GLOBAL EXPLANATION --------
+            # -------- GLOBAL --------
             st.markdown("#### 🌍 Global Explanation")
 
             fig, ax = plt.subplots()
             shap.summary_plot(shap_values, X_sample, show=False)
             st.pyplot(fig)
 
-            # -------- LOCAL EXPLANATION --------
+            # -------- LOCAL --------
             st.markdown("#### 🔍 Local Explanation")
 
             fig2, ax2 = plt.subplots()
-            shap.plots.waterfall(shap.Explanation(
-                values=shap_values[0],
-                base_values=explainer.expected_value,
-                data=X_sample[0]
-            ), show=False)
-
+            shap.plots.waterfall(
+                shap.Explanation(
+                    values=shap_values[0],
+                    base_values=explainer.expected_value,
+                    data=X_sample.iloc[0]
+                ),
+                show=False
+            )
             st.pyplot(fig2)
 
         except Exception as e:
-            st.error("SHAP failed (try smaller dataset)")
+            st.error("SHAP failed — try smaller dataset")
             st.write(e)
 
     else:
