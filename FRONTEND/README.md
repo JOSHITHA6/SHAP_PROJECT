@@ -85,7 +85,7 @@ streamlit run app.py
 
 ## 👩‍💻 Author
 
-Palavalasa Sai Joshitha
-Final Year Engineering Student
-AI/ML & Data Science Enthusiast
+- Palavalasa Sai Joshitha
+- Final Year Engineering Student
+- AI/ML & Data Science Enthusiast
 ---
