@@ -1,81 +1,74 @@
-
-import sys
-import os
-
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import streamlit as st
 import pandas as pd
 
+st.set_page_config(layout="wide")
+
+# ---------- CSS ----------
 st.markdown("""
 <style>
-
-/* Center main container */
 .block-container {
-    max-width: 700px;
+    max-width: 800px;
     margin: auto;
 }
-
-/* Card box */
-.custom-box {
-    background-color: #ffffff;
+.card {
+    background-color: white;
     padding: 25px;
     border-radius: 12px;
-    box-shadow: 0px 4px 15px rgba(0,0,0,0.08);
+    box-shadow: 0px 4px 12px rgba(0,0,0,0.08);
 }
-
-/* Upload box styling */
-.stFileUploader {
-    background-color: #f1f3f6;
-    padding: 15px;
-    border-radius: 10px;
-}
-
-/* Info message full width */
-.full-width {
+.stButton>button {
     width: 100%;
+    height: 45px;
+    border-radius: 8px;
+    background-color: #4a7cff;
+    color: white;
+    font-size: 16px;
 }
-
-/* Title center */
-h1 {
-    text-align: center;
-}
-
 </style>
 """, unsafe_allow_html=True)
-from BACKEND.model import train_model
-from BACKEND.shap_explainer import explain_model
 
-st.title("SHAP Explainability Tool")
+# ---------- TITLE ----------
+st.markdown("<h1 style='text-align:center;'>SHAP Explainability Tool</h1>", unsafe_allow_html=True)
 
-# Upload dataset
-file = st.file_uploader("Upload CSV", type=["csv"])
+# ---------- CARD ----------
+st.markdown('<div class="card">', unsafe_allow_html=True)
 
-if file is not None:
-    df = pd.read_csv(file)
+# ---------- FORM ----------
+with st.form("shap_form"):
 
-    st.success("Dataset Preview:")
-    st.dataframe(df.head())
+    st.subheader("Upload CSV")
+    file = st.file_uploader("", type=["csv"])
 
-    target = st.selectbox("Select Target Column", df.columns)
-
-    task = st.radio("Select Task", ["Classification", "Regression"])
-
-    if task == "Classification":
-        model_type = st.selectbox(
-            "Select Model",
-            ["Logistic Regression", "Random Forest", "SVM", "XGBoost"]
-        )
+    st.subheader("Dataset Preview")
+    df = None
+    if file is not None:
+        df = pd.read_csv(file)
+        st.dataframe(df.head())
     else:
-        model_type = st.selectbox(
-            "Select Model",
-            ["Linear Regression", "Random Forest", "SVR", "XGBoost"]
-        )
+        st.info("Please upload a dataset to get started.")
 
-    if st.button("Run Model"):
-        with st.spinner("Training model and generating SHAP explanations..."):
-            model = train_model(df, target, model_type)
-            fig = explain_model(model, df.drop(columns=[target]), model_type)
-        st.pyplot(fig)
-       
-else:
-    st.info("Please upload a dataset to get started.")
+    st.subheader("Select Target Column")
+    if df is not None:
+        target = st.selectbox("", df.columns)
+    else:
+        target = st.selectbox("", ["Upload dataset first"], disabled=True)
+
+    st.subheader("Select Task")
+    task = st.radio("", ["Classification", "Regression"])
+
+    st.subheader("Select Model")
+    if task == "Classification":
+        model = st.selectbox("", ["Random Forest", "Logistic Regression", "SVM", "XGBoost"])
+    else:
+        model = st.selectbox("", ["Linear Regression", "Random Forest", "SVR", "XGBoost"])
+
+    run = st.form_submit_button("Run Model")
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# ---------- RUN LOGIC ----------
+if run:
+    if file is None:
+        st.warning("Please upload a dataset first")
+    else:
+        st.success("Running model...")
