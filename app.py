@@ -1,3 +1,7 @@
+import sys
+import os
+
+sys.path.append(os.path.abspath("."))
 import streamlit as st
 import pandas as pd
 
