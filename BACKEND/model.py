@@ -1,51 +1,19 @@
-from sklearn.model_selection import train_test_split
-from utils.preprocess import preprocess_data
+from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-# Classification
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
-from xgboost import XGBClassifier
+def train_model(X_train, y_train, task, model_type):
 
-# Regression
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.svm import SVR
-from xgboost import XGBRegressor
-
-
-def train_model(df, target, task, model_type):
-    X, y = preprocess_data(df, target)
-    
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
-
-    # Model mappings
-    classification_models = {
-        "Logistic Regression": LogisticRegression(),
-        "Random Forest": RandomForestClassifier(),
-        "SVM": SVC(probability=True),
-        "XGBoost": XGBClassifier()
-    }
-
-    regression_models = {
-        "Linear Regression": LinearRegression(),
-        "Random Forest": RandomForestRegressor(),
-        "SVR": SVR(),
-        "XGBoost": XGBRegressor()
-    }
-
-    # Select model
     if task == "Classification":
-        model = classification_models.get(model_type)
-    else:
-        model = regression_models.get(model_type)
+        if model_type == "Random Forest":
+            model = RandomForestClassifier()
+        else:
+            model = LogisticRegression(max_iter=2000)
 
-    if model is None:
-        raise ValueError("Invalid model selected")
+    else:
+        if model_type == "Random Forest":
+            model = RandomForestRegressor()
+        else:
+            model = LinearRegression()
 
     model.fit(X_train, y_train)
-
-    return model, X_test
+    return model
