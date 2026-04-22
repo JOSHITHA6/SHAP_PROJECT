@@ -44,7 +44,7 @@ with col1:
 # RIGHT SIDE (OUTPUT)
 # ====================================================
 with col2:
-    st.subheader("📊 Output Screen")
+    st.subheader("📊 Output ")
 
     if run and df is not None:
 
