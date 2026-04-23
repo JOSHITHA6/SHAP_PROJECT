@@ -13,7 +13,7 @@ from sklearn.metrics import accuracy_score, r2_score
 st.set_page_config(layout="wide")
 
 # ====================================================
-# 🎨 CLEAN UI CSS
+# 🎨 CSS (ALIGNMENT FIXED)
 # ====================================================
 st.markdown("""
 <style>
@@ -39,9 +39,11 @@ st.markdown("""
     margin: auto;
 }
 
-/* Fix column alignment */
-[data-testid="column"] {
-    align-self: stretch;
+/* FORCE TOP ALIGNMENT */
+[data-testid="column"] > div {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
 }
 
 </style>
@@ -58,12 +60,13 @@ st.title("📊 SHAP Explainability Tool")
 col1, col_gap, col2 = st.columns([1, 0.08, 1])
 
 # ====================================================
-# LEFT SIDE (INPUT)
+# LEFT SIDE
 # ====================================================
 with col1:
     st.markdown('<div class="section-box">', unsafe_allow_html=True)
 
-    st.subheader("⚙️ Configure SHAP")
+    st.markdown("### ⚙️ Configure SHAP")
+    st.markdown("<br>", unsafe_allow_html=True)
 
     file = st.file_uploader("Upload CSV", type=["csv"])
 
@@ -86,18 +89,19 @@ with col1:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ====================================================
-# CENTER DIVIDER
+# DIVIDER
 # ====================================================
 with col_gap:
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
 # ====================================================
-# RIGHT SIDE (OUTPUT)
+# RIGHT SIDE
 # ====================================================
 with col2:
     st.markdown('<div class="section-box">', unsafe_allow_html=True)
 
-    st.subheader("📊 Output")
+    st.markdown("### 📊 Output")
+    st.markdown("<br>", unsafe_allow_html=True)
 
     if run and df is not None:
 
@@ -111,22 +115,26 @@ with col2:
 
             y_pred = model.predict(X_test)
 
-            # -------- METRICS --------
-            if task == "Classification":
-                acc = accuracy_score(y_test, y_pred)
-                st.success(f"Accuracy: {round(acc*100,2)}%")
-            else:
-                score = r2_score(y_test, y_pred)
-                st.success(f"R² Score: {round(score,3)}")
+        # -------- METRICS --------
+        st.markdown('<div style="margin-top:0px;">', unsafe_allow_html=True)
 
-            # ====================================================
-            # 🔥 SHAP
-            # ====================================================
-            st.markdown("## 🔍 SHAP Explanation")
+        if task == "Classification":
+            acc = accuracy_score(y_test, y_pred)
+            st.success(f"Accuracy: {round(acc*100,2)}%")
+        else:
+            score = r2_score(y_test, y_pred)
+            st.success(f"R² Score: {round(score,3)}")
 
-            X_sample = X_test.iloc[:30]
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            fig_global, fig_local = generate_shap_plots(model, X_sample)
+        # ====================================================
+        # SHAP
+        # ====================================================
+        st.markdown("## 🔍 SHAP Explanation")
+
+        X_sample = X_test.iloc[:30]
+
+        fig_global, fig_local = generate_shap_plots(model, X_sample)
 
         # -------- TABS --------
         tab1, tab2 = st.tabs(["🌍 Global Explanation", "🔍 Local Explanation"])
