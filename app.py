@@ -11,14 +11,58 @@ from sklearn.metrics import accuracy_score, r2_score
 # CONFIG
 # ====================================================
 st.set_page_config(layout="wide")
+
+# ====================================================
+# 🎨 CLEAN UI CSS
+# ====================================================
+st.markdown("""
+<style>
+
+/* Background */
+.stApp {
+    background-color: #f8fafc;
+}
+
+/* Section Box */
+.section-box {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    height: 100%;
+}
+
+/* Divider */
+.divider {
+    border-left: 2px solid #e2e8f0;
+    height: 100%;
+    margin: auto;
+}
+
+/* Fix column alignment */
+[data-testid="column"] {
+    align-self: stretch;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ====================================================
+# TITLE
+# ====================================================
 st.title("📊 SHAP Explainability Tool")
 
-col1, col2 = st.columns([1, 1])
+# ====================================================
+# LAYOUT (WITH GAP)
+# ====================================================
+col1, col_gap, col2 = st.columns([1, 0.08, 1])
 
 # ====================================================
 # LEFT SIDE (INPUT)
 # ====================================================
 with col1:
+    st.markdown('<div class="section-box">', unsafe_allow_html=True)
+
     st.subheader("⚙️ Configure SHAP")
 
     file = st.file_uploader("Upload CSV", type=["csv"])
@@ -39,12 +83,21 @@ with col1:
 
     run = st.button("🚀 Run Model")
 
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ====================================================
+# CENTER DIVIDER
+# ====================================================
+with col_gap:
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
 # ====================================================
 # RIGHT SIDE (OUTPUT)
 # ====================================================
 with col2:
-    st.subheader("📊 Output ")
+    st.markdown('<div class="section-box">', unsafe_allow_html=True)
+
+    st.subheader("📊 Output")
 
     if run and df is not None:
 
@@ -67,11 +120,10 @@ with col2:
                 st.success(f"R² Score: {round(score,3)}")
 
             # ====================================================
-            # 🔥 SHAP (FAST + SAFE)
+            # 🔥 SHAP
             # ====================================================
             st.markdown("## 🔍 SHAP Explanation")
 
-            # ⚡ Sample for speed
             X_sample = X_test.iloc[:30]
 
             fig_global, fig_local = generate_shap_plots(model, X_sample)
@@ -87,3 +139,5 @@ with col2:
 
     else:
         st.info("Upload dataset and click Run")
+
+    st.markdown('</div>', unsafe_allow_html=True)
