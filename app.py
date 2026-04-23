@@ -13,7 +13,7 @@ from sklearn.metrics import accuracy_score, r2_score
 st.set_page_config(layout="wide")
 
 # ====================================================
-# 🎨 CSS (ALIGNMENT FIXED)
+# 🎨 CLEAN UI CSS (NO RANDOM GAPS)
 # ====================================================
 st.markdown("""
 <style>
@@ -39,11 +39,16 @@ st.markdown("""
     margin: auto;
 }
 
-/* FORCE TOP ALIGNMENT */
+/* Force top alignment */
 [data-testid="column"] > div {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
+}
+
+/* Reduce uploader spacing */
+[data-testid="stFileUploader"] {
+    margin-top: -10px;
 }
 
 </style>
@@ -55,7 +60,7 @@ st.markdown("""
 st.title("📊 SHAP Explainability Tool")
 
 # ====================================================
-# LAYOUT (WITH GAP)
+# LAYOUT
 # ====================================================
 col1, col_gap, col2 = st.columns([1, 0.08, 1])
 
@@ -65,8 +70,12 @@ col1, col_gap, col2 = st.columns([1, 0.08, 1])
 with col1:
     st.markdown('<div class="section-box">', unsafe_allow_html=True)
 
-    st.markdown("### ⚙️ Configure SHAP")
-    st.markdown("<br>", unsafe_allow_html=True)
+    # ✅ Consistent header
+    st.markdown("## ⚙️ Configure SHAP")
+    st.caption("Upload dataset and configure model")
+
+    # spacing
+    st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
 
     file = st.file_uploader("Upload CSV", type=["csv"])
 
@@ -100,8 +109,12 @@ with col_gap:
 with col2:
     st.markdown('<div class="section-box">', unsafe_allow_html=True)
 
-    st.markdown("### 📊 Output")
-    st.markdown("<br>", unsafe_allow_html=True)
+    # ✅ Same header structure
+    st.markdown("## 📊 Output")
+    st.caption("Model results and explanations")
+
+    # spacing
+    st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
 
     if run and df is not None:
 
@@ -116,8 +129,6 @@ with col2:
             y_pred = model.predict(X_test)
 
         # -------- METRICS --------
-        st.markdown('<div style="margin-top:0px;">', unsafe_allow_html=True)
-
         if task == "Classification":
             acc = accuracy_score(y_test, y_pred)
             st.success(f"Accuracy: {round(acc*100,2)}%")
@@ -125,18 +136,13 @@ with col2:
             score = r2_score(y_test, y_pred)
             st.success(f"R² Score: {round(score,3)}")
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # ====================================================
-        # SHAP
-        # ====================================================
+        # -------- SHAP --------
         st.markdown("## 🔍 SHAP Explanation")
 
         X_sample = X_test.iloc[:30]
 
         fig_global, fig_local = generate_shap_plots(model, X_sample)
 
-        # -------- TABS --------
         tab1, tab2 = st.tabs(["🌍 Global Explanation", "🔍 Local Explanation"])
 
         with tab1:
@@ -146,6 +152,16 @@ with col2:
             st.pyplot(fig_local)
 
     else:
-        st.info("Upload dataset and click Run")
+        # ✅ Custom info box (aligned properly)
+        st.markdown("""
+        <div style="
+            background-color:#e2e8f0;
+            padding:12px;
+            border-radius:8px;
+            font-size:14px;
+        ">
+        Upload dataset and click Run
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
