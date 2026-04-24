@@ -23,7 +23,6 @@ st.markdown("""
 .stApp {
     background-color: #f8fafc;
 }
-
 .section-box {
     background: white;
     padding: 20px;
@@ -31,13 +30,11 @@ st.markdown("""
     border: 1px solid #e2e8f0;
     height: 100%;
 }
-
 .divider {
     border-left: 2px solid #e2e8f0;
     height: 100%;
     margin: auto;
 }
-
 [data-testid="column"] > div {
     display: flex;
     flex-direction: column;
@@ -62,8 +59,7 @@ col1, col_gap, col2 = st.columns([1, 0.08, 1])
 with col1:
     st.markdown('<div class="section-box">', unsafe_allow_html=True)
 
-    st.markdown("### ⚙️ Configure SHAP")
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.subheader("⚙️ Configure SHAP")
 
     file = st.file_uploader("Upload CSV", type=["csv"])
 
@@ -104,14 +100,14 @@ with col_gap:
 with col2:
     st.markdown('<div class="section-box">', unsafe_allow_html=True)
 
-    st.markdown("### 📊 Output")
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.subheader("📊 Output")
 
     if run and df is not None and target is not None:
 
+        # -------- MODEL CACHE --------
         if "model" not in st.session_state:
 
-            with st.spinner("Running model + SHAP... ⏳"):
+            with st.spinner("Training model..."):
 
                 X_train, X_test, y_train, y_test = preprocess_data(df, target)
                 model = train_model(X_train, y_train, task, model_type)
@@ -126,15 +122,13 @@ with col2:
 
         y_pred = model.predict(X_test)
 
-        # ====================================================
-        # METRICS
-        # ====================================================
+        # -------- METRICS --------
         if task == "Classification":
             acc = accuracy_score(y_test, y_pred)
-            st.success(f"Accuracy: {round(acc * 100, 2)}%")
+            st.success(f"Accuracy: {round(acc*100,2)}%")
         else:
             score = r2_score(y_test, y_pred)
-            st.success(f"R² Score: {round(score, 3)}")
+            st.success(f"R² Score: {round(score,3)}")
 
         # ====================================================
         # SHAP
@@ -151,26 +145,26 @@ with col2:
         with tab1:
 
             plot_type = st.selectbox(
-                "Select Global Explanation Graph",
-                ["Bar", "Beeswarm", "Violin"],
-                index=0
+                "Select Global Graph",
+                ["Bar", "Beeswarm", "Violin"]
             )
 
             explainer = shap.TreeExplainer(model)
             shap_values = explainer(X_sample, check_additivity=False)
 
             feature_names = X_sample.columns
+            shap_array = shap_values.values
 
-            # ---------- PLOT ----------
+            # -------- PLOTS --------
             if plot_type == "Bar":
-                abs_shap = np.abs(shap_values.values).mean(axis=0)
+                abs_shap = np.abs(shap_array).mean(axis=0)
 
                 fig = plt.figure()
                 idx = np.argsort(abs_shap)
 
                 plt.barh(feature_names[idx], abs_shap[idx])
-                plt.xlabel("Mean |SHAP Value| (Impact)")
-                plt.title("Feature Importance (Global)")
+                plt.xlabel("Mean |SHAP Value|")
+                plt.title("Global Feature Importance")
 
                 st.pyplot(fig)
 
@@ -184,10 +178,10 @@ with col2:
                 shap.summary_plot(shap_values, X_sample, plot_type="violin", show=False)
                 st.pyplot(fig)
 
-            # ---------- INSIGHTS ----------
-            mean_shap = shap_values.values.mean(axis=0)
-            abs_shap = np.abs(shap_values.values).mean(axis=0)
-
+            # ====================================================
+            # IMPROVED EXPLANATION
+            # ====================================================
+            abs_shap = np.abs(shap_array).mean(axis=0)
             total = abs_shap.sum()
             percent = (abs_shap / total) * 100
 
@@ -198,53 +192,32 @@ with col2:
 
             for i in top_idx:
                 feat = feature_names[i]
-                direction = mean_shap[i]
                 pct = percent[i]
 
-                pos_ratio = (shap_values.values[:, i] > 0).mean()
+                pos_ratio = (shap_array[:, i] > 0).mean()
+                neg_ratio = (shap_array[:, i] < 0).mean()
 
                 if pos_ratio > 0.6:
                     trend = "mostly increases"
-                elif pos_ratio < 0.4:
+                    icon = "🔺"
+                elif neg_ratio > 0.6:
                     trend = "mostly decreases"
+                    icon = "🔻"
                 else:
                     trend = "mixed effect"
+                    icon = "⚖️"
 
-                arrow = "🔺" if direction > 0 else "🔻"
-                dir_text = "increases" if direction > 0 else "decreases"
+                st.write(f"{icon} **{feat}**: {pct:.1f}% contribution → {trend}")
 
-                st.write(
-                    f"{arrow} **{feat}**: {pct:.1f}% contribution → "
-                    f"{dir_text} prediction (**{trend}**)"
-                )
-
-            # ---------- GUIDE ----------
-            st.markdown("### 📈 How to Read This")
-
-            if plot_type == "Bar":
-                st.markdown("""
-- Bars show feature importance  
-- Higher = more impact  
-- Does not show direction  
-""")
-
-            elif plot_type == "Beeswarm":
-                st.markdown("""
-- Each dot = data point  
-- Right → increases prediction  
-- Left → decreases prediction  
-- Red = high value, Blue = low  
-""")
-
-            elif plot_type == "Violin":
-                st.markdown("""
-- Shows distribution of feature impact  
-- Wider = more frequent  
-""")
-
+            # -------- GUIDE --------
             st.markdown("""
-📌 Direction is averaged across dataset.  
-Feature can both increase and decrease depending on case.
+### 📈 How to Read
+
+- Bar → importance only  
+- Beeswarm → direction + distribution  
+- Violin → distribution shape  
+
+📌 Direction is based on overall pattern, not just average.
 """)
 
         # ====================================================
@@ -255,12 +228,12 @@ Feature can both increase and decrease depending on case.
             total_rows = len(X_test)
 
             st.markdown(f"""
-📊 Total rows in dataset: **{len(df)}**  
-🧪 Rows used for SHAP (test set): **{total_rows}**
+📊 Total dataset rows: **{len(df)}**  
+🧪 SHAP uses test rows: **{total_rows}**
 """)
 
             row_number = st.number_input(
-                "Row Number",
+                "Select Row",
                 min_value=1,
                 max_value=total_rows,
                 value=st.session_state.get("row_number", 1),
@@ -271,7 +244,6 @@ Feature can both increase and decrease depending on case.
             row_index = row_number - 1
             X_single = X_test.iloc[[row_index]]
 
-            st.markdown("### Selected Row Preview")
             st.dataframe(X_single)
 
             _, fig_local = generate_shap_plots(model, X_sample, X_single)
