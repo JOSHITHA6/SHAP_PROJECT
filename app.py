@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import shap
+import matplotlib.pyplot as plt
 
 from BACKEND.model import train_model
 from BACKEND.shap_explainer import generate_shap_plots
@@ -113,7 +114,6 @@ with col2:
             with st.spinner("Running model + SHAP... ⏳"):
 
                 X_train, X_test, y_train, y_test = preprocess_data(df, target)
-
                 model = train_model(X_train, y_train, task, model_type)
 
                 st.session_state["model"] = model
@@ -126,7 +126,9 @@ with col2:
 
         y_pred = model.predict(X_test)
 
-        # -------- METRICS --------
+        # ====================================================
+        # METRICS
+        # ====================================================
         if task == "Classification":
             acc = accuracy_score(y_test, y_pred)
             st.success(f"Accuracy: {round(acc*100,2)}%")
@@ -144,41 +146,63 @@ with col2:
         tab1, tab2 = st.tabs(["🌍 Global Explanation", "🔍 Local Explanation"])
 
         # ====================================================
-        # 🌍 GLOBAL
+        # 🌍 GLOBAL (BAR PLOT + INSIGHTS)
         # ====================================================
         with tab1:
-            fig_global, _ = generate_shap_plots(model, X_sample, None)
-            st.pyplot(fig_global)
 
-            # ---------- INTERPRETATION GUIDE ----------
-            st.markdown("""
-### 📈 How to Read This Graph
-
-- Each dot = one data point  
-- 🔴 Red = high feature value  
-- 🔵 Blue = low feature value  
-- ➡️ Right side = increases prediction  
-- ⬅️ Left side = decreases prediction  
-""")
-
-            # ---------- FEATURE IMPORTANCE ----------
-            explainer = shap.Explainer(model, X_sample)
+            explainer = shap.TreeExplainer(model)
             shap_values = explainer(X_sample, check_additivity=False)
 
-            mean_importance = np.abs(shap_values.values).mean(axis=0)
-            feature_importance = dict(zip(X_sample.columns, mean_importance))
+            # -------- Mean SHAP ----------
+            mean_shap = shap_values.values.mean(axis=0)
+            abs_shap = np.abs(shap_values.values).mean(axis=0)
 
-            sorted_features = sorted(feature_importance.items(), key=lambda x: x[1], reverse=True)
+            feature_names = X_sample.columns
 
-            st.markdown("### 📌 Key Influential Features")
+            # -------- BAR PLOT ----------
+            fig_bar = plt.figure()
+            sorted_idx = np.argsort(abs_shap)
 
-            for i, (feature, value) in enumerate(sorted_features[:3], 1):
-                st.write(f"{i}. {feature} has strong impact on predictions")
+            plt.barh(feature_names[sorted_idx], abs_shap[sorted_idx])
+            plt.xlabel("Mean |SHAP Value| (Impact)")
+            plt.title("Feature Importance (Global)")
+            st.pyplot(fig_bar)
+
+            # -------- PERCENT ----------
+            total = abs_shap.sum()
+            percent_contribution = (abs_shap / total) * 100
+
+            # -------- TOP K ----------
+            TOP_K = 5
+            sorted_idx_desc = np.argsort(abs_shap)[::-1][:TOP_K]
+
+            st.markdown("### 📌 Key Feature Insights")
+
+            for i in sorted_idx_desc:
+                feature = feature_names[i]
+                direction = mean_shap[i]
+                percent = percent_contribution[i]
+
+                if direction > 0:
+                    st.write(f"🔺 {feature}: **{percent:.1f}%** contribution → increases prediction")
+                else:
+                    st.write(f"🔻 {feature}: **{percent:.1f}%** contribution → decreases prediction")
+
+            # -------- GUIDE ----------
+            st.markdown("""
+### 📈 Interpretation Guide
+
+- Bars show how important each feature is  
+- Percentage shows contribution strength  
+- 🔺 means increases prediction  
+- 🔻 means decreases prediction  
+""")
 
         # ====================================================
         # 🔍 LOCAL
         # ====================================================
         with tab2:
+
             total_rows = len(X_test)
 
             st.markdown(f"""
