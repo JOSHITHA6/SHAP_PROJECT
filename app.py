@@ -10,7 +10,6 @@ from sklearn.metrics import (
     r2_score, mean_absolute_error, mean_squared_error
 )
 
-# ================= CONFIG =================
 st.set_page_config(layout="wide")
 st.title("Explainable AI Dashboard (SHAP-Based Insights)")
 
@@ -64,7 +63,7 @@ if st.session_state["page"] == "input":
 
             model = train_model(X_train, y_train, task, model_type)
 
-            # Combine test data with target
+            # Combine test data + target
             test_display = X_test_original.copy()
             test_display[target] = y_test.values
             test_display = test_display.reset_index(drop=True)
@@ -103,7 +102,7 @@ elif st.session_state["page"] == "output":
     # ================= LAYOUT =================
     left_col, right_col = st.columns([1, 1])
 
-    # ================= LEFT SIDE =================
+    # ================= LEFT =================
     with left_col:
 
         st.markdown("### 📄 Test Dataset (20%)")
@@ -125,14 +124,18 @@ elif st.session_state["page"] == "output":
             st.write(f"MAE: {mean_absolute_error(y_test, y_pred):.2f}")
             st.write(f"RMSE: {(mean_squared_error(y_test, y_pred))**0.5:.2f}")
 
-    # ================= RIGHT SIDE =================
+    # ================= RIGHT =================
     with right_col:
 
         tab1, tab2 = st.tabs(["🌍 Global Explainability", "🔍 Local Explainability"])
 
         # -------- GLOBAL --------
         with tab1:
-            fig_global, _ = generate_shap_plots(model, X_test)
+            fig_global, _ = generate_shap_plots(
+                model,
+                X_test,
+                feature_names=feature_cols
+            )
             st.pyplot(fig_global)
 
         # -------- LOCAL --------
@@ -140,22 +143,23 @@ elif st.session_state["page"] == "output":
 
             option = st.radio("Choose Option", ["Select Row", "Enter New Data"])
 
-            # OPTION A
             if option == "Select Row":
 
                 row = st.number_input("Row Number", 1, len(X_test), 1)
-
                 X_single = X_test[row-1:row]
 
-                _, fig_local = generate_shap_plots(model, X_test, X_single)
+                _, fig_local = generate_shap_plots(
+                    model,
+                    X_test,
+                    X_single,
+                    feature_names=feature_cols
+                )
                 st.pyplot(fig_local)
 
-            # OPTION B
             else:
 
                 st.info("Fill all fields and click Predict")
 
-                # 🔥 FORM (NO FLICKER)
                 with st.form("manual_input_form"):
 
                     input_data = {}
@@ -165,7 +169,7 @@ elif st.session_state["page"] == "output":
                     for i, col in enumerate(feature_cols):
                         with cols[i % 2]:
                             input_data[col] = st.text_input(
-                                col,  # ✅ ACTUAL FEATURE NAME
+                                col,
                                 placeholder="Enter value"
                             )
 
@@ -173,7 +177,6 @@ elif st.session_state["page"] == "output":
 
                     if submitted:
 
-                        # Validation
                         if any(v.strip() == "" for v in input_data.values()):
                             st.error("⚠️ Please fill all fields")
                         else:
@@ -190,7 +193,12 @@ elif st.session_state["page"] == "output":
 
                                 st.success(f"Prediction: {pred[0]}")
 
-                                _, fig_local = generate_shap_plots(model, X_test, new_processed)
+                                _, fig_local = generate_shap_plots(
+                                    model,
+                                    X_test,
+                                    new_processed,
+                                    feature_names=feature_cols
+                                )
                                 st.pyplot(fig_local)
 
                             except:
