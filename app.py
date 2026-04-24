@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+import shap
 
 from BACKEND.model import train_model
 from BACKEND.shap_explainer import generate_shap_plots
@@ -62,7 +64,6 @@ with col1:
     st.markdown("### ⚙️ Configure SHAP")
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ---------- FILE UPLOAD ----------
     file = st.file_uploader("Upload CSV", type=["csv"])
 
     if file is not None:
@@ -107,7 +108,6 @@ with col2:
 
     if run and df is not None and target is not None:
 
-        # ---------- CACHE MODEL ----------
         if "model" not in st.session_state:
 
             with st.spinner("Running model + SHAP... ⏳"):
@@ -126,7 +126,7 @@ with col2:
 
         y_pred = model.predict(X_test)
 
-        # ---------- METRICS ----------
+        # -------- METRICS --------
         if task == "Classification":
             acc = accuracy_score(y_test, y_pred)
             st.success(f"Accuracy: {round(acc*100,2)}%")
@@ -143,16 +143,44 @@ with col2:
 
         tab1, tab2 = st.tabs(["🌍 Global Explanation", "🔍 Local Explanation"])
 
-        # ---------- GLOBAL ----------
+        # ====================================================
+        # 🌍 GLOBAL
+        # ====================================================
         with tab1:
             fig_global, _ = generate_shap_plots(model, X_sample, None)
             st.pyplot(fig_global)
 
-        # ---------- LOCAL ----------
+            # ---------- INTERPRETATION GUIDE ----------
+            st.markdown("""
+### 📈 How to Read This Graph
+
+- Each dot = one data point  
+- 🔴 Red = high feature value  
+- 🔵 Blue = low feature value  
+- ➡️ Right side = increases prediction  
+- ⬅️ Left side = decreases prediction  
+""")
+
+            # ---------- FEATURE IMPORTANCE ----------
+            explainer = shap.Explainer(model, X_sample)
+            shap_values = explainer(X_sample, check_additivity=False)
+
+            mean_importance = np.abs(shap_values.values).mean(axis=0)
+            feature_importance = dict(zip(X_sample.columns, mean_importance))
+
+            sorted_features = sorted(feature_importance.items(), key=lambda x: x[1], reverse=True)
+
+            st.markdown("### 📌 Key Influential Features")
+
+            for i, (feature, value) in enumerate(sorted_features[:3], 1):
+                st.write(f"{i}. {feature} has strong impact on predictions")
+
+        # ====================================================
+        # 🔍 LOCAL
+        # ====================================================
         with tab2:
             total_rows = len(X_test)
 
-            # 🔥 UX CLARITY FIX
             st.markdown(f"""
 📊 Total rows in dataset: **{len(df)}**  
 🧪 Rows used for SHAP (test set): **{total_rows}**
