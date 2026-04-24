@@ -1,23 +1,56 @@
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.linear_model import LogisticRegression, LinearRegression
+import shap
+import matplotlib.pyplot as plt
+import pandas as pd
 
-def train_model(X_train, y_train, task, model_type):
+def generate_shap_plots(model, X_sample, X_single=None, feature_names=None):
 
-    if task == "Classification":
+    # Ensure DataFrame with correct column names
+    if not isinstance(X_sample, pd.DataFrame):
+        X_sample = pd.DataFrame(X_sample, columns=feature_names)
 
-        if model_type == "Random Forest":
-            model = RandomForestClassifier(class_weight='balanced')
-
-        elif model_type == "Logistic Regression":
-            model = LogisticRegression(max_iter=1000)
-
+    # Choose correct explainer
+    if hasattr(model, "estimators_"):
+        explainer = shap.TreeExplainer(model)
     else:
+        explainer = shap.LinearExplainer(model, X_sample)
 
-        if model_type == "Random Forest":
-            model = RandomForestRegressor()
+    shap_values = explainer(X_sample)
 
-        elif model_type == "Linear Regression":
-            model = LinearRegression()
+    plt.close('all')
 
-    model.fit(X_train, y_train)
-    return model
+    # ===== GLOBAL =====
+    fig_global = plt.figure()
+
+    shap.summary_plot(
+        shap_values,
+        X_sample,
+        plot_type="violin",
+        show=False
+    )
+
+    plt.xlabel("SHAP value (impact on prediction)")
+    plt.ylabel("Features")
+
+    # ===== LOCAL =====
+    fig_local = None
+
+    if X_single is not None:
+
+        if not isinstance(X_single, pd.DataFrame):
+            X_single = pd.DataFrame(X_single, columns=feature_names)
+
+        shap_single = explainer(X_single)
+
+        fig_local = plt.figure()
+
+        shap.waterfall_plot(
+            shap.Explanation(
+                values=shap_single.values[0],
+                base_values=shap_single.base_values[0],
+                data=X_single.iloc[0],
+                feature_names=feature_names
+            ),
+            show=False
+        )
+
+    return fig_global, fig_local
