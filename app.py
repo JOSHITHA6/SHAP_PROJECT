@@ -17,12 +17,8 @@ st.title("Explainable AI Dashboard (SHAP-Based Insights)")
 if "page" not in st.session_state:
     st.session_state["page"] = "input"
 
-# =========================================================
-# ======================= INPUT PAGE =======================
-# =========================================================
+# ================= INPUT PAGE =================
 if st.session_state["page"] == "input":
-
-    st.subheader("📥 Input Panel")
 
     file = st.file_uploader("Upload CSV", type=["csv"])
 
@@ -36,37 +32,30 @@ if st.session_state["page"] == "input":
 
         target = st.selectbox("Target Column", df.columns)
 
-        # Auto detect task
-        if df[target].nunique() <= 10:
-            task = "Classification"
-        else:
-            task = "Regression"
+        task = "Classification" if df[target].nunique() <= 10 else "Regression"
 
         st.write(f"Detected Task: {task}")
 
-        if task == "Classification":
-            model_type = st.selectbox("Model", ["Random Forest", "Logistic Regression"])
-        else:
-            model_type = st.selectbox("Model", ["Random Forest", "Linear Regression"])
+        model_type = st.selectbox(
+            "Model",
+            ["Random Forest", "Logistic Regression"] if task == "Classification"
+            else ["Random Forest", "Linear Regression"]
+        )
 
-        ready = target is not None and model_type is not None
-
-        if st.button("🚀 Run Model", disabled=not ready):
+        if st.button("Run Model"):
 
             (
                 X_train, X_test,
                 y_train, y_test,
                 X_test_original,
                 preprocessor,
-                feature_cols
+                feature_names
             ) = preprocess_data(df, target)
 
             model = train_model(X_train, y_train, task, model_type)
 
-            # Combine test data + target
             test_display = X_test_original.copy()
             test_display[target] = y_test.values
-            test_display = test_display.reset_index(drop=True)
 
             st.session_state.update({
                 "model": model,
@@ -74,132 +63,76 @@ if st.session_state["page"] == "input":
                 "y_test": y_test,
                 "test_display": test_display,
                 "preprocessor": preprocessor,
-                "feature_cols": feature_cols,
-                "target": target,
+                "feature_names": feature_names,
                 "task": task
             })
 
             st.session_state["page"] = "output"
             st.rerun()
 
-# =========================================================
-# ======================= OUTPUT PAGE ======================
-# =========================================================
-elif st.session_state["page"] == "output":
-
-    if st.button("⬅️ Back"):
-        st.session_state["page"] = "input"
-        st.rerun()
+# ================= OUTPUT PAGE =================
+else:
 
     model = st.session_state["model"]
     X_test = st.session_state["X_test"]
     y_test = st.session_state["y_test"]
     test_display = st.session_state["test_display"]
-    feature_cols = st.session_state["feature_cols"]
+    feature_names = st.session_state["feature_names"]
     preprocessor = st.session_state["preprocessor"]
     task = st.session_state["task"]
 
-    # ================= LAYOUT =================
-    left_col, right_col = st.columns([1, 1])
+    col1, col2 = st.columns(2)
 
-    # ================= LEFT =================
-    with left_col:
-
-        st.markdown("### 📄 Test Dataset (20%)")
+    # LEFT
+    with col1:
         st.dataframe(test_display)
 
         st.divider()
 
-        st.markdown("### 📈 Model Performance")
-
         y_pred = model.predict(X_test)
 
         if task == "Classification":
-            st.success(f"Accuracy: {accuracy_score(y_test, y_pred):.2f}")
-            st.write(f"Precision: {precision_score(y_test, y_pred, zero_division=0):.2f}")
-            st.write(f"Recall: {recall_score(y_test, y_pred, zero_division=0):.2f}")
-            st.write(f"F1 Score: {f1_score(y_test, y_pred, zero_division=0):.2f}")
+            st.write("Accuracy:", accuracy_score(y_test, y_pred))
         else:
-            st.success(f"R²: {r2_score(y_test, y_pred):.2f}")
-            st.write(f"MAE: {mean_absolute_error(y_test, y_pred):.2f}")
-            st.write(f"RMSE: {(mean_squared_error(y_test, y_pred))**0.5:.2f}")
+            st.write("R²:", r2_score(y_test, y_pred))
 
-    # ================= RIGHT =================
-    with right_col:
+    # RIGHT
+    with col2:
 
-        tab1, tab2 = st.tabs(["🌍 Global Explainability", "🔍 Local Explainability"])
+        tab1, tab2 = st.tabs(["Global", "Local"])
 
-        # -------- GLOBAL --------
         with tab1:
-            fig_global, _ = generate_shap_plots(
-                model,
-                X_test,
-                feature_names=feature_cols
-            )
-            st.pyplot(fig_global)
+            fig, _ = generate_shap_plots(model, X_test, feature_names=feature_names)
+            st.pyplot(fig)
 
-        # -------- LOCAL --------
         with tab2:
 
-            option = st.radio("Choose Option", ["Select Row", "Enter New Data"])
+            with st.form("input_form"):
 
-            if option == "Select Row":
+                input_data = {}
 
-                row = st.number_input("Row Number", 1, len(X_test), 1)
-                X_single = X_test[row-1:row]
+                for i, col in enumerate(feature_names):
+                    input_data[col] = st.text_input(col)
 
-                _, fig_local = generate_shap_plots(
-                    model,
-                    X_test,
-                    X_single,
-                    feature_names=feature_cols
-                )
-                st.pyplot(fig_local)
+                submit = st.form_submit_button("Predict")
 
-            else:
+                if submit:
 
-                st.info("Fill all fields and click Predict")
+                    input_data = {k: float(v) for k, v in input_data.items()}
 
-                with st.form("manual_input_form"):
+                    new_df = pd.DataFrame([input_data])
 
-                    input_data = {}
+                    new_processed = new_df.values  # already aligned
 
-                    cols = st.columns(2)
+                    pred = model.predict(new_processed)
 
-                    for i, col in enumerate(feature_cols):
-                        with cols[i % 2]:
-                            input_data[col] = st.text_input(
-                                col,
-                                placeholder="Enter value"
-                            )
+                    st.success(f"Prediction: {pred[0]}")
 
-                    submitted = st.form_submit_button("Predict")
+                    _, fig_local = generate_shap_plots(
+                        model,
+                        X_test,
+                        new_processed,
+                        feature_names=feature_names
+                    )
 
-                    if submitted:
-
-                        if any(v.strip() == "" for v in input_data.values()):
-                            st.error("⚠️ Please fill all fields")
-                        else:
-                            try:
-                                for k in input_data:
-                                    input_data[k] = float(input_data[k])
-
-                                new_df = pd.DataFrame([input_data])
-                                new_df = new_df[feature_cols]
-
-                                new_processed = preprocessor.transform(new_df)
-
-                                pred = model.predict(new_processed)
-
-                                st.success(f"Prediction: {pred[0]}")
-
-                                _, fig_local = generate_shap_plots(
-                                    model,
-                                    X_test,
-                                    new_processed,
-                                    feature_names=feature_cols
-                                )
-                                st.pyplot(fig_local)
-
-                            except:
-                                st.error("⚠️ Enter valid numeric values")
+                    st.pyplot(fig_local)
