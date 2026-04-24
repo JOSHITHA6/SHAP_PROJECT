@@ -6,11 +6,10 @@ def generate_shap_plots(
     model,
     X_sample,
     X_single=None,
-    feature_names=None,
-    original_row=None
+    feature_names=None
 ):
 
-    # Convert to DataFrame for SHAP
+    # Ensure DataFrame
     if not isinstance(X_sample, pd.DataFrame):
         X_sample = pd.DataFrame(X_sample, columns=feature_names)
 
@@ -49,12 +48,11 @@ def generate_shap_plots(
 
         fig_local = plt.figure()
 
-        # 🔥 USE ORIGINAL VALUES HERE
+        # ✅ FIX: DO NOT PASS original data (causes mismatch)
         shap.waterfall_plot(
             shap.Explanation(
                 values=shap_single.values[0],
                 base_values=shap_single.base_values[0],
-                data=original_row.iloc[0],   # ✅ ONLY ORIGINAL VALUES
                 feature_names=feature_names
             ),
             show=False
