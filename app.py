@@ -10,6 +10,7 @@ from sklearn.metrics import (
     r2_score, mean_absolute_error, mean_squared_error
 )
 
+# ================= CONFIG =================
 st.set_page_config(layout="wide")
 st.title("Explainable AI Dashboard (SHAP-Based Insights)")
 
@@ -91,15 +92,16 @@ elif st.session_state.page == "output":
     feature_names = st.session_state.feature_names
     task = st.session_state.task
 
-    # ================= LAYOUT =================
-    left, right = st.columns([1, 1])
+    # ================= SPACED LAYOUT =================
+    left, spacer, right = st.columns([1.1, 0.1, 1.4])
 
     # ================= LEFT SIDE =================
     with left:
-        st.markdown("### 📄 Test Dataset (20%)")
-        st.dataframe(test_display)
 
-        st.divider()
+        st.markdown("### 📄 Test Dataset (20%)")
+        st.dataframe(test_display, height=350)
+
+        st.markdown("---")
 
         st.markdown("### 📈 Model Performance")
 
@@ -118,6 +120,8 @@ elif st.session_state.page == "output":
     # ================= RIGHT SIDE =================
     with right:
 
+        st.markdown("<br>", unsafe_allow_html=True)
+
         tab1, tab2 = st.tabs(["🌍 Global Explainability", "🔍 Local Explainability"])
 
         # ================= GLOBAL =================
@@ -126,7 +130,7 @@ elif st.session_state.page == "output":
             with st.spinner("Generating SHAP..."):
                 fig_global, _ = generate_shap_plots(
                     model,
-                    X_test[:100],  # ⚡ speed optimization
+                    X_test[:100],
                     feature_names=feature_names
                 )
 
@@ -140,7 +144,7 @@ elif st.session_state.page == "output":
                 ["Select Row", "Enter New Data"]
             )
 
-            # -------- OPTION 1: SELECT ROW --------
+            # -------- OPTION 1 --------
             if option == "Select Row":
 
                 row = st.number_input("Row Number", 1, len(X_test), 1)
@@ -156,7 +160,7 @@ elif st.session_state.page == "output":
 
                 st.pyplot(fig_local)
 
-            # -------- OPTION 2: MANUAL INPUT --------
+            # -------- OPTION 2 --------
             else:
 
                 st.info("Fill all fields and click Predict")
@@ -182,7 +186,6 @@ elif st.session_state.page == "output":
                                     input_data[k] = float(input_data[k])
 
                                 new_df = pd.DataFrame([input_data])
-
                                 new_processed = new_df.values
 
                                 pred = model.predict(new_processed)
