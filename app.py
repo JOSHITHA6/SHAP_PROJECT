@@ -128,13 +128,35 @@ with col2:
         st.markdown('</div>', unsafe_allow_html=True)
 
         # ====================================================
+        # 🔥 NEW: ROW SELECTION (ONLY ADDITION)
+        # ====================================================
+        st.markdown("### 🔎 Select Row for Local Explanation")
+
+        row_index = st.number_input(
+            "Enter row index",
+            min_value=0,
+            max_value=len(X_test)-1,
+            value=0,
+            step=1
+        )
+
+        # ====================================================
         # SHAP
         # ====================================================
         st.markdown("## 🔍 SHAP Explanation")
 
+        # GLOBAL
         X_sample = X_test.iloc[:30]
 
-        fig_global, fig_local = generate_shap_plots(model, X_sample)
+        # LOCAL (selected row)
+        X_single = X_test.iloc[[row_index]]
+
+        # UPDATED CALL
+        fig_global, fig_local = generate_shap_plots(
+            model,
+            X_sample,
+            X_single
+        )
 
         # -------- TABS --------
         tab1, tab2 = st.tabs(["🌍 Global Explanation", "🔍 Local Explanation"])
