@@ -10,45 +10,15 @@ from utils.preprocess import preprocess_data
 
 from sklearn.metrics import accuracy_score, r2_score
 
-# ====================================================
-# CONFIG
-# ====================================================
+# ================= CONFIG =================
 st.set_page_config(layout="wide")
 
-# ====================================================
-# CSS
-# ====================================================
-st.markdown("""
-<style>
-.stApp { background-color: #f8fafc; }
-.section-box {
-    background: white;
-    padding: 20px;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-}
-.divider {
-    border-left: 2px solid #e2e8f0;
-    height: 100%;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ====================================================
-# TITLE
-# ====================================================
 st.title("📊 SHAP Explainability Tool")
 
-# ====================================================
-# LAYOUT
-# ====================================================
-col1, col_gap, col2 = st.columns([1, 0.05, 1])
+col1, col2 = st.columns(2)
 
-# ====================================================
-# LEFT SIDE
-# ====================================================
+# ================= LEFT =================
 with col1:
-    st.markdown('<div class="section-box">', unsafe_allow_html=True)
 
     file = st.file_uploader("Upload CSV", type=["csv"])
 
@@ -58,7 +28,7 @@ with col1:
     df = st.session_state.get("df", None)
 
     if df is not None:
-        st.dataframe(df, height=350)
+        st.dataframe(df.head(20))
         target = st.selectbox("Target Column", df.columns)
     else:
         target = None
@@ -67,21 +37,23 @@ with col1:
 
     model_type = st.selectbox(
         "Model",
-        ["Random Forest", "Linear/Logistic Regression"]
+        ["Random Forest", "Linear Regression", "Logistic Regression"]
     )
+
+    # 🔴 validation
+    if task == "Classification" and model_type == "Linear Regression":
+        st.error("Linear Regression cannot be used for Classification")
+
+    if task == "Regression" and model_type == "Logistic Regression":
+        st.error("Logistic Regression cannot be used for Regression")
 
     if st.button("Run Model"):
         st.session_state["run"] = True
 
     run = st.session_state.get("run", False)
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ====================================================
-# RIGHT SIDE
-# ====================================================
+# ================= RIGHT =================
 with col2:
-    st.markdown('<div class="section-box">', unsafe_allow_html=True)
 
     if run and df is not None and target is not None:
 
@@ -98,32 +70,34 @@ with col2:
         X_test = st.session_state["X_test"]
         y_test = st.session_state["y_test"]
 
-        y_pred = model.predict(X_test)
-
-        # ====================================================
-        # METRICS
-        # ====================================================
+        # ================= PREDICTION FIX =================
         if task == "Classification":
-            st.success(f"Accuracy: {accuracy_score(y_test, y_pred)*100:.2f}%")
+            if hasattr(model, "predict_proba"):
+                y_pred = (model.predict_proba(X_test)[:, 1] > 0.5).astype(int)
+            else:
+                y_pred = model.predict(X_test).astype(int)
         else:
-            st.success(f"R² Score: {r2_score(y_test, y_pred):.3f}")
+            y_pred = model.predict(X_test)
 
-        # ====================================================
-        # SHAP
-        # ====================================================
+        # ================= METRICS =================
+        if task == "Classification":
+            acc = accuracy_score(y_test, y_pred)
+            st.success(f"Accuracy: {acc*100:.2f}%")
+        else:
+            score = r2_score(y_test, y_pred)
+            st.success(f"R² Score: {score:.3f}")
+
         st.markdown("## 🔍 SHAP Explanation")
 
         X_sample = X_test.sample(min(50, len(X_test)), random_state=42)
 
         tab1, tab2 = st.tabs(["Global", "Local"])
 
-        # ====================================================
-        # GLOBAL
-        # ====================================================
+        # ================= GLOBAL =================
         with tab1:
 
             plot_type = st.selectbox(
-                "Select Graph Type",
+                "Graph Type",
                 ["Bar", "Beeswarm", "Violin"]
             )
 
@@ -133,13 +107,13 @@ with col2:
             shap_array = shap_values.values
             features = X_sample.columns
 
-            # ---------- PLOTS ----------
+            # ===== PLOTS =====
             if plot_type == "Bar":
-                abs_vals = np.abs(shap_array).mean(axis=0)
-                idx = np.argsort(abs_vals)
+                vals = np.abs(shap_array).mean(axis=0)
+                idx = np.argsort(vals)
 
                 fig = plt.figure()
-                plt.barh(features[idx], abs_vals[idx])
+                plt.barh(features[idx], vals[idx])
                 plt.title("Feature Importance")
                 st.pyplot(fig)
 
@@ -148,63 +122,63 @@ with col2:
                 shap.plots.beeswarm(shap_values, show=False)
                 st.pyplot(fig)
 
-            elif plot_type == "Violin":
+            else:
                 fig = plt.figure()
                 shap.summary_plot(shap_values, X_sample, plot_type="violin", show=False)
                 st.pyplot(fig)
 
-                st.info("""
-Violin plot shows distribution of impact.
-Left → decreases prediction
-Right → increases prediction
-Width → number of data points
-""")
+            # ===== CLEAR EXPLANATION =====
+            vals = np.abs(shap_array).mean(axis=0)
+            percent = vals / vals.sum() * 100
 
-            # ====================================================
-            # CORRECT TREND LOGIC (WEIGHTED)
-            # ====================================================
-            abs_vals = np.abs(shap_array).mean(axis=0)
-            percent = abs_vals / abs_vals.sum() * 100
+            increase, decrease, mixed = [], [], []
 
-            st.markdown("### 📌 Feature Insights")
-
-            for i in np.argsort(abs_vals)[::-1][:5]:
+            for i in np.argsort(vals)[::-1][:6]:
 
                 feat = features[i]
 
-                pos_strength = np.sum(shap_array[:, i][shap_array[:, i] > 0])
-                neg_strength = -np.sum(shap_array[:, i][shap_array[:, i] < 0])
-
-                total = pos_strength + neg_strength
+                pos = np.sum(shap_array[:, i][shap_array[:, i] > 0])
+                neg = -np.sum(shap_array[:, i][shap_array[:, i] < 0])
+                total = pos + neg
 
                 if total == 0:
-                    trend = "no impact"
-                elif pos_strength / total > 0.6:
-                    trend = "mostly increases"
-                elif neg_strength / total > 0.6:
-                    trend = "mostly decreases"
+                    continue
+
+                if pos / total > 0.6:
+                    increase.append((feat, percent[i]))
+                elif neg / total > 0.6:
+                    decrease.append((feat, percent[i]))
                 else:
-                    trend = "mixed effect"
+                    mixed.append((feat, percent[i]))
 
-                st.write(f"• {feat}: {percent[i]:.1f}% → {trend}")
+            st.markdown("### 📌 Feature Impact")
 
-        # ====================================================
-        # LOCAL
-        # ====================================================
+            if increase:
+                st.markdown("### 🔺 Increases Prediction")
+                for f, p in increase:
+                    st.write(f"{f} → {p:.1f}%")
+
+            if decrease:
+                st.markdown("### 🔻 Decreases Prediction")
+                for f, p in decrease:
+                    st.write(f"{f} → {p:.1f}%")
+
+            if mixed:
+                st.markdown("### ⚖️ Mixed Effect")
+                for f, p in mixed:
+                    st.write(f"{f} → {p:.1f}%")
+
+        # ================= LOCAL =================
         with tab2:
 
-            total_rows = len(X_test)
+            total = len(X_test)
+            row = st.number_input("Select Row", 1, total, 1)
 
-            row = st.number_input(
-                "Select Row",
-                1,
-                total_rows,
-                1,
-                key="row"
-            )
+            st.markdown("### 🧾 Original Input")
+            st.dataframe(df.iloc[[row-1]])
 
+            st.markdown("### ⚙️ Model Input")
             X_single = X_test.iloc[[row-1]]
-
             st.dataframe(X_single)
 
             _, fig_local = generate_shap_plots(model, X_sample, X_single)
@@ -212,5 +186,3 @@ Width → number of data points
 
     else:
         st.info("Upload dataset and run model")
-
-    st.markdown('</div>', unsafe_allow_html=True)
