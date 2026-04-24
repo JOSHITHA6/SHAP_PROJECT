@@ -99,7 +99,8 @@ with col2:
 
             plot_type = st.selectbox(
                 "Graph Type",
-                ["Bar", "Beeswarm", "Violin"]
+                ["Violin"]
+                '''["Bar", "Beeswarm", "Violin"]'''
             )
 
             # ================= EXPLAINER =================
@@ -131,15 +132,15 @@ with col2:
                 plt.title("Feature Importance")
                 st.pyplot(fig)
 
-            elif plot_type == "Beeswarm":
+            '''elif plot_type == "Beeswarm":
                 fig = plt.figure()
                 shap.plots.beeswarm(shap_values, show=False)
-                st.pyplot(fig)
+                st.pyplot(fig)'''
 
-            else:
+            '''else:
                 fig = plt.figure()
                 shap.summary_plot(shap_values, X_sample, plot_type="violin", show=False)
-                st.pyplot(fig)
+                st.pyplot(fig)'''
 
             # ================= INSIGHTS =================
             vals = np.abs(shap_array).mean(axis=0)
