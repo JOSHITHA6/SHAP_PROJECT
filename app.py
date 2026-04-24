@@ -10,7 +10,6 @@ from utils.preprocess import preprocess_data
 
 from sklearn.metrics import accuracy_score, r2_score
 
-# ================= CONFIG =================
 st.set_page_config(layout="wide")
 st.title("📊 SHAP Explainability Tool")
 
@@ -39,15 +38,20 @@ with col1:
         ["Random Forest", "Linear Regression", "Logistic Regression"]
     )
 
-    # 🔴 Validation
+    # ================= STRICT VALIDATION =================
+    invalid_combo = False
+
     if task == "Classification" and model_type == "Linear Regression":
-        st.error("Linear Regression cannot be used for Classification")
+        st.error("❌ Linear Regression is NOT suitable for Classification")
+        invalid_combo = True
 
     if task == "Regression" and model_type == "Logistic Regression":
-        st.error("Logistic Regression cannot be used for Regression")
+        st.error("❌ Logistic Regression is NOT suitable for Regression")
+        invalid_combo = True
 
     if st.button("Run Model"):
-        st.session_state["run"] = True
+        if not invalid_combo:
+            st.session_state["run"] = True
 
     run = st.session_state.get("run", False)
 
@@ -69,7 +73,7 @@ with col2:
         X_test = st.session_state["X_test"]
         y_test = st.session_state["y_test"]
 
-        # ================= PREDICTION FIX =================
+        # ================= PREDICTIONS =================
         if task == "Classification":
             if hasattr(model, "predict_proba"):
                 y_pred = (model.predict_proba(X_test)[:, 1] > 0.5).astype(int)
@@ -80,11 +84,9 @@ with col2:
 
         # ================= METRICS =================
         if task == "Classification":
-            acc = accuracy_score(y_test, y_pred)
-            st.success(f"Accuracy: {acc*100:.2f}%")
+            st.success(f"Accuracy: {accuracy_score(y_test, y_pred)*100:.2f}%")
         else:
-            score = r2_score(y_test, y_pred)
-            st.success(f"R² Score: {score:.3f}")
+            st.success(f"R² Score: {r2_score(y_test, y_pred):.3f}")
 
         st.markdown("## 🔍 SHAP Explanation")
 
@@ -100,22 +102,24 @@ with col2:
                 ["Bar", "Beeswarm", "Violin"]
             )
 
-            # ================= AUTO EXPLAINER =================
+            # ================= EXPLAINER =================
             try:
-                if hasattr(model, "estimators_"):  # Tree models
+                if hasattr(model, "estimators_"):
                     explainer = shap.TreeExplainer(model)
                 else:
                     explainer = shap.LinearExplainer(model, X_sample)
 
                 shap_values = explainer(X_sample)
 
-            except Exception:
-                # fallback (safe mode)
+            except:
                 explainer = shap.Explainer(model, X_sample)
                 shap_values = explainer(X_sample)
 
             shap_array = shap_values.values
             features = X_sample.columns
+
+            # ✅ FIX: convert to numpy
+            feature_names = np.array(features)
 
             # ================= PLOTS =================
             if plot_type == "Bar":
@@ -123,7 +127,7 @@ with col2:
                 idx = np.argsort(vals)
 
                 fig = plt.figure()
-                plt.barh(features[idx], vals[idx])
+                plt.barh(feature_names[idx], vals[idx])
                 plt.title("Feature Importance")
                 st.pyplot(fig)
 
@@ -137,7 +141,7 @@ with col2:
                 shap.summary_plot(shap_values, X_sample, plot_type="violin", show=False)
                 st.pyplot(fig)
 
-            # ================= CLEAR EXPLANATION =================
+            # ================= INSIGHTS =================
             vals = np.abs(shap_array).mean(axis=0)
             percent = vals / vals.sum() * 100
 
@@ -145,7 +149,7 @@ with col2:
 
             for i in np.argsort(vals)[::-1][:6]:
 
-                feat = features[i]
+                feat = feature_names[i]
 
                 pos = np.sum(shap_array[:, i][shap_array[:, i] > 0])
                 neg = -np.sum(shap_array[:, i][shap_array[:, i] < 0])
