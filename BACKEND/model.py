@@ -1,18 +1,18 @@
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression
 
 def train_model(X_train, y_train, task, model_type):
 
     if task == "Classification":
 
         if model_type == "Random Forest":
-            model = RandomForestClassifier()
+            model = RandomForestClassifier(class_weight='balanced')
 
         elif model_type == "Logistic Regression":
-            model = LogisticRegression(max_iter=1000)
+            model = LogisticRegression(max_iter=1000, class_weight='balanced')
 
-        elif model_type == "Linear Regression":
-            raise ValueError("Linear Regression cannot be used for Classification")
+        else:
+            raise ValueError("Invalid model for classification")
 
     else:
 
@@ -22,8 +22,8 @@ def train_model(X_train, y_train, task, model_type):
         elif model_type == "Linear Regression":
             model = LinearRegression()
 
-        elif model_type == "Logistic Regression":
-            raise ValueError("Logistic Regression cannot be used for Regression")
+        else:
+            raise ValueError("Invalid model for regression")
 
     model.fit(X_train, y_train)
     return model
