@@ -12,7 +12,6 @@ from sklearn.metrics import accuracy_score, r2_score
 
 # ================= CONFIG =================
 st.set_page_config(layout="wide")
-
 st.title("📊 SHAP Explainability Tool")
 
 col1, col2 = st.columns(2)
@@ -40,7 +39,7 @@ with col1:
         ["Random Forest", "Linear Regression", "Logistic Regression"]
     )
 
-    # 🔴 validation
+    # 🔴 Validation
     if task == "Classification" and model_type == "Linear Regression":
         st.error("Linear Regression cannot be used for Classification")
 
@@ -101,13 +100,24 @@ with col2:
                 ["Bar", "Beeswarm", "Violin"]
             )
 
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer(X_sample, check_additivity=False)
+            # ================= AUTO EXPLAINER =================
+            try:
+                if hasattr(model, "estimators_"):  # Tree models
+                    explainer = shap.TreeExplainer(model)
+                else:
+                    explainer = shap.LinearExplainer(model, X_sample)
+
+                shap_values = explainer(X_sample)
+
+            except Exception:
+                # fallback (safe mode)
+                explainer = shap.Explainer(model, X_sample)
+                shap_values = explainer(X_sample)
 
             shap_array = shap_values.values
             features = X_sample.columns
 
-            # ===== PLOTS =====
+            # ================= PLOTS =================
             if plot_type == "Bar":
                 vals = np.abs(shap_array).mean(axis=0)
                 idx = np.argsort(vals)
@@ -127,7 +137,7 @@ with col2:
                 shap.summary_plot(shap_values, X_sample, plot_type="violin", show=False)
                 st.pyplot(fig)
 
-            # ===== CLEAR EXPLANATION =====
+            # ================= CLEAR EXPLANATION =================
             vals = np.abs(shap_array).mean(axis=0)
             percent = vals / vals.sum() * 100
 

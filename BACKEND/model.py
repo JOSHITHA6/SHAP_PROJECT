@@ -3,7 +3,6 @@ from sklearn.linear_model import LinearRegression, LogisticRegression
 
 def train_model(X_train, y_train, task, model_type):
 
-    # ================= CLASSIFICATION =================
     if task == "Classification":
 
         if model_type == "Random Forest":
@@ -15,7 +14,6 @@ def train_model(X_train, y_train, task, model_type):
         elif model_type == "Linear Regression":
             raise ValueError("Linear Regression cannot be used for Classification")
 
-    # ================= REGRESSION =================
     else:
 
         if model_type == "Random Forest":
