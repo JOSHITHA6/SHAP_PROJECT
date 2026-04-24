@@ -124,18 +124,18 @@ with col2:
 
             # ================= PLOTS =================
             #if plot_type == "Bar":
-            '''vals = np.abs(shap_array).mean(axis=0)
+            """vals = np.abs(shap_array).mean(axis=0)
                 idx = np.argsort(vals)
 
                 fig = plt.figure()
                 plt.barh(feature_names[idx], vals[idx])
                 plt.title("Feature Importance")
-                st.pyplot(fig)'''
+                st.pyplot(fig)"""
 
             #elif plot_type == "Beeswarm":
-            '''fig = plt.figure()
+            """fig = plt.figure()
                 shap.plots.beeswarm(shap_values, show=False)
-                st.pyplot(fig)'''
+                st.pyplot(fig)"""
 
             if plot_type == "Violin":
                 fig = plt.figure()
