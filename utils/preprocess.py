@@ -32,7 +32,6 @@ def preprocess_data(df, target_col):
         X, y, test_size=0.2, random_state=42, shuffle=True
     )
 
-    # RESET INDEX (IMPORTANT FIX)
     X_test = X_test.reset_index(drop=True)
     y_test = y_test.reset_index(drop=True)
 
