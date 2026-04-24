@@ -1,17 +1,18 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import shap
-import matplotlib.pyplot as plt
 
+from utils.preprocess import preprocess_data
 from BACKEND.model import train_model
 from BACKEND.shap_explainer import generate_shap_plots
-from utils.preprocess import preprocess_data
 
-from sklearn.metrics import accuracy_score, r2_score
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score,
+    r2_score, mean_absolute_error, mean_squared_error
+)
 
 st.set_page_config(layout="wide")
-st.title("📊 SHAP Explainability Tool")
+st.title("SHAP- AI MODEL EXPLAINABILITY TOOL")
 
 col1, col2 = st.columns(2)
 
@@ -21,169 +22,104 @@ with col1:
     file = st.file_uploader("Upload CSV", type=["csv"])
 
     if file:
-        st.session_state["df"] = pd.read_csv(file)
-
-    df = st.session_state.get("df", None)
-
-    if df is not None:
-        st.dataframe(df.head(20))
+        df = pd.read_csv(file)
         target = st.selectbox("Target Column", df.columns)
-    else:
-        target = None
 
-    task = st.radio("Task", ["Classification", "Regression"])
+        # Auto detect task
+        if df[target].nunique() <= 10:
+            task = "Classification"
+        else:
+            task = "Regression"
 
-    model_type = st.selectbox(
-        "Model",
-        ["Random Forest", "Linear Regression", "Logistic Regression"]
-    )
+        st.write(f"Detected Task: {task}")
 
-    # ================= STRICT VALIDATION =================
-    invalid_combo = False
+        if task == "Classification":
+            model_type = st.selectbox("Model", ["Random Forest", "Logistic Regression"])
+        else:
+            model_type = st.selectbox("Model", ["Random Forest", "Linear Regression"])
 
-    if task == "Classification" and model_type == "Linear Regression":
-        st.error("❌ Linear Regression is NOT suitable for Classification")
-        invalid_combo = True
+        if st.button("Run Model"):
 
-    if task == "Regression" and model_type == "Logistic Regression":
-        st.error("❌ Logistic Regression is NOT suitable for Regression")
-        invalid_combo = True
+            (
+                X_train, X_test,
+                y_train, y_test,
+                X_test_original,
+                preprocessor,
+                feature_cols
+            ) = preprocess_data(df, target)
 
-    if st.button("Run Model"):
-        if not invalid_combo:
-            st.session_state["run"] = True
+            model = train_model(X_train, y_train, task, model_type)
 
-    run = st.session_state.get("run", False)
+            st.session_state.update({
+                "model": model,
+                "X_test": X_test,
+                "y_test": y_test,
+                "X_test_original": X_test_original,
+                "preprocessor": preprocessor,
+                "feature_cols": feature_cols,
+                "task": task
+            })
 
 # ================= RIGHT =================
 with col2:
 
-    if run and df is not None and target is not None:
-
-        if "model" not in st.session_state:
-
-            X_train, X_test, y_train, y_test = preprocess_data(df, target)
-            model = train_model(X_train, y_train, task, model_type)
-
-            st.session_state["model"] = model
-            st.session_state["X_test"] = X_test
-            st.session_state["y_test"] = y_test
+    if "model" in st.session_state:
 
         model = st.session_state["model"]
         X_test = st.session_state["X_test"]
         y_test = st.session_state["y_test"]
+        task = st.session_state["task"]
 
-        # ================= PREDICTIONS =================
+        # ===== PREDICTIONS =====
         if task == "Classification":
-            if hasattr(model, "predict_proba"):
-                y_pred = (model.predict_proba(X_test)[:, 1] > 0.5).astype(int)
-            else:
-                y_pred = model.predict(X_test).astype(int)
+            y_pred = model.predict(X_test)
+
+            st.success(f"Accuracy: {accuracy_score(y_test, y_pred):.2f}")
+            st.write(f"Precision: {precision_score(y_test, y_pred):.2f}")
+            st.write(f"Recall: {recall_score(y_test, y_pred):.2f}")
+            st.write(f"F1 Score: {f1_score(y_test, y_pred):.2f}")
+
         else:
             y_pred = model.predict(X_test)
 
-        # ================= METRICS =================
-        if task == "Classification":
-            st.success(f"Accuracy: {accuracy_score(y_test, y_pred)*100:.2f}%")
-        else:
-            st.success(f"R² Score: {r2_score(y_test, y_pred):.3f}")
+            st.success(f"R²: {r2_score(y_test, y_pred):.2f}")
+            st.write(f"MAE: {mean_absolute_error(y_test, y_pred):.2f}")
+            st.write(f"RMSE: {mean_squared_error(y_test, y_pred)**0.5:.2f}")
 
-        st.markdown("## 🔍 SHAP Explanation")
+        st.markdown("## 🔍 Global SHAP")
 
-        X_sample = X_test.sample(min(50, len(X_test)), random_state=42)
+        fig_global, _ = generate_shap_plots(model, X_test)
+        st.pyplot(fig_global)
 
-        tab1, tab2 = st.tabs(["Global", "Local"])
+        # ===== LOCAL =====
+        st.markdown("## 🔍 Local Explanation")
 
-        # ================= GLOBAL =================
-        with tab1:
+        option = st.radio("Choose Option", ["Select Row", "Enter New Data"])
 
-            plot_type = st.selectbox(
-                "Graph Type",
-                ["Violin"],
-                #["Bar", "Beeswarm", "Violin"]
-            )
+        if option == "Select Row":
+            row = st.number_input("Row", 1, len(X_test), 1)
+            X_single = X_test[row-1:row]
 
-            # ================= EXPLAINER =================
-            try:
-                if hasattr(model, "estimators_"):
-                    explainer = shap.TreeExplainer(model)
-                else:
-                    explainer = shap.LinearExplainer(model, X_sample)
-
-                shap_values = explainer(X_sample)
-
-            except:
-                explainer = shap.Explainer(model, X_sample)
-                shap_values = explainer(X_sample)
-
-            shap_array = shap_values.values
-            features = X_sample.columns
-
-            # ✅ FIX: convert to numpy
-            feature_names = np.array(features)
-
-            # ================= PLOTS =================
-           
-            fig = plt.figure()
-            shap.summary_plot(shap_values, X_sample, plot_type="violin", show=False)
-            st.pyplot(fig)
-
-            # ================= INSIGHTS =================
-            vals = np.abs(shap_array).mean(axis=0)
-            percent = vals / vals.sum() * 100
-
-            increase, decrease, mixed = [], [], []
-
-            for i in np.argsort(vals)[::-1][:6]:
-
-                feat = feature_names[i]
-
-                pos = np.sum(shap_array[:, i][shap_array[:, i] > 0])
-                neg = -np.sum(shap_array[:, i][shap_array[:, i] < 0])
-                total = pos + neg
-
-                if total == 0:
-                    continue
-
-                if pos / total > 0.6:
-                    increase.append((feat, percent[i]))
-                elif neg / total > 0.6:
-                    decrease.append((feat, percent[i]))
-                else:
-                    mixed.append((feat, percent[i]))
-
-            st.markdown("### 📌 Feature Impact")
-
-            if increase:
-                st.markdown("### 🔺 Increases Prediction")
-                for f, p in increase:
-                    st.write(f"{f} → {p:.1f}%")
-
-            if decrease:
-                st.markdown("### 🔻 Decreases Prediction")
-                for f, p in decrease:
-                    st.write(f"{f} → {p:.1f}%")
-
-            if mixed:
-                st.markdown("### ⚖️ Mixed Effect")
-                for f, p in mixed:
-                    st.write(f"{f} → {p:.1f}%")
-
-        # ================= LOCAL =================
-        with tab2:
-
-            total = len(X_test)
-            row = st.number_input("Select Row", 1, total, 1)
-
-            st.markdown("### 🧾 Original Input")
-            st.dataframe(df.iloc[[row-1]])
-
-            st.markdown("### ⚙️ Model Input")
-            X_single = X_test.iloc[[row-1]]
-            st.dataframe(X_single)
-
-            _, fig_local = generate_shap_plots(model, X_sample, X_single)
+            _, fig_local = generate_shap_plots(model, X_test, X_single)
             st.pyplot(fig_local)
 
-    else:
-        st.info("Upload dataset and run model")
+        else:
+            st.markdown("### Enter Feature Values")
+
+            input_data = {}
+
+            for col in st.session_state["feature_cols"]:
+                if col != st.session_state["feature_cols"][-1]:
+                    input_data[col] = st.number_input(col)
+
+            if st.button("Predict"):
+
+                new_df = pd.DataFrame([input_data])
+                new_processed = st.session_state["preprocessor"].transform(new_df)
+
+                pred = model.predict(new_processed)
+
+                st.success(f"Prediction: {pred[0]}")
+
+                _, fig_local = generate_shap_plots(model, X_test, new_processed)
+                st.pyplot(fig_local)
