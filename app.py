@@ -68,7 +68,7 @@ with col1:
     if file:
         df = pd.read_csv(file)
 
-        # 🔥 SHOW FULL DATASET (SCROLLABLE)
+        # ✅ FULL DATASET (SCROLLABLE)
         st.dataframe(df, use_container_width=True, height=400)
 
         target = st.selectbox("Select Target Column", df.columns)
@@ -103,15 +103,15 @@ with col2:
 
         with st.spinner("Running model + SHAP... ⏳"):
 
-            # PREPROCESS
+            # -------- PREPROCESS --------
             X_train, X_test, y_train, y_test = preprocess_data(df, target)
 
-            # MODEL
+            # -------- MODEL --------
             model = train_model(X_train, y_train, task, model_type)
 
             y_pred = model.predict(X_test)
 
-        # METRICS
+        # -------- METRICS --------
         if task == "Classification":
             acc = accuracy_score(y_test, y_pred)
             st.success(f"Accuracy: {round(acc*100,2)}%")
@@ -119,13 +119,14 @@ with col2:
             score = r2_score(y_test, y_pred)
             st.success(f"R² Score: {round(score,3)}")
 
-        # SHAP TITLE
+        # ====================================================
+        # SHAP
+        # ====================================================
         st.markdown("## 🔍 SHAP Explanation")
 
         # GLOBAL SAMPLE
         X_sample = X_test.iloc[:30]
 
-        # TABS
         tab1, tab2 = st.tabs(["🌍 Global Explanation", "🔍 Local Explanation"])
 
         # ====================================================
@@ -136,23 +137,30 @@ with col2:
             st.pyplot(fig_global)
 
         # ====================================================
-        # 🔍 LOCAL (WITH ROW SELECTION)
+        # 🔍 LOCAL (USER FRIENDLY INDEXING)
         # ====================================================
         with tab2:
 
             total_rows = len(X_test)
 
-            st.markdown(f"Select row between **0 and {total_rows-1}**")
+            st.markdown(f"Select row between **1 and {total_rows}**")
 
-            row_index = st.number_input(
-                "Row Index",
-                min_value=0,
-                max_value=total_rows - 1,
-                value=0,
+            row_number = st.number_input(
+                "Row Number",
+                min_value=1,
+                max_value=total_rows,
+                value=1,
                 step=1
             )
 
+            # 🔥 Convert to 0-based index
+            row_index = row_number - 1
+
             X_single = X_test.iloc[[row_index]]
+
+            # Optional preview
+            st.markdown("### Selected Row Preview")
+            st.dataframe(X_single)
 
             _, fig_local = generate_shap_plots(model, X_sample, X_single)
 
