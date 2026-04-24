@@ -62,16 +62,19 @@ with col1:
     st.markdown("### ⚙️ Configure SHAP")
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # ---------- FILE UPLOAD ----------
     file = st.file_uploader("Upload CSV", type=["csv"])
 
-    df = None
-    if file:
-        df = pd.read_csv(file)
+    if file is not None:
+        st.session_state["df"] = pd.read_csv(file)
 
-        # ✅ FULL DATASET (SCROLLABLE)
+    df = st.session_state.get("df", None)
+
+    if df is not None:
         st.dataframe(df, use_container_width=True, height=400)
-
         target = st.selectbox("Select Target Column", df.columns)
+    else:
+        target = None
 
     task = st.radio("Task", ["Classification", "Regression"])
 
@@ -80,7 +83,10 @@ with col1:
         ["Random Forest", "Linear/Logistic Regression"]
     )
 
-    run = st.button("🚀 Run Model")
+    if st.button("🚀 Run Model"):
+        st.session_state["run"] = True
+
+    run = st.session_state.get("run", False)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -99,19 +105,28 @@ with col2:
     st.markdown("### 📊 Output")
     st.markdown("<br>", unsafe_allow_html=True)
 
-    if run and df is not None:
+    if run and df is not None and target is not None:
 
-        with st.spinner("Running model + SHAP... ⏳"):
+        # ---------- CACHE MODEL ----------
+        if "model" not in st.session_state:
 
-            # -------- PREPROCESS --------
-            X_train, X_test, y_train, y_test = preprocess_data(df, target)
+            with st.spinner("Running model + SHAP... ⏳"):
 
-            # -------- MODEL --------
-            model = train_model(X_train, y_train, task, model_type)
+                X_train, X_test, y_train, y_test = preprocess_data(df, target)
 
-            y_pred = model.predict(X_test)
+                model = train_model(X_train, y_train, task, model_type)
 
-        # -------- METRICS --------
+                st.session_state["model"] = model
+                st.session_state["X_test"] = X_test
+                st.session_state["y_test"] = y_test
+
+        model = st.session_state["model"]
+        X_test = st.session_state["X_test"]
+        y_test = st.session_state["y_test"]
+
+        y_pred = model.predict(X_test)
+
+        # ---------- METRICS ----------
         if task == "Classification":
             acc = accuracy_score(y_test, y_pred)
             st.success(f"Accuracy: {round(acc*100,2)}%")
@@ -124,46 +139,43 @@ with col2:
         # ====================================================
         st.markdown("## 🔍 SHAP Explanation")
 
-        # GLOBAL SAMPLE
-        X_sample = X_test.iloc[:30]
+        X_sample = X_test.sample(min(30, len(X_test)), random_state=42)
 
         tab1, tab2 = st.tabs(["🌍 Global Explanation", "🔍 Local Explanation"])
 
-        # ====================================================
-        # 🌍 GLOBAL
-        # ====================================================
+        # ---------- GLOBAL ----------
         with tab1:
             fig_global, _ = generate_shap_plots(model, X_sample, None)
             st.pyplot(fig_global)
 
-        # ====================================================
-        # 🔍 LOCAL (USER FRIENDLY INDEXING)
-        # ====================================================
+        # ---------- LOCAL ----------
         with tab2:
-
             total_rows = len(X_test)
 
-            st.markdown(f"Select row between **1 and {total_rows}**")
+            # 🔥 UX CLARITY FIX
+            st.markdown(f"""
+📊 Total rows in dataset: **{len(df)}**  
+🧪 Rows used for SHAP (test set): **{total_rows}**
+
+Select row from **test dataset** (1 to {total_rows})
+""")
 
             row_number = st.number_input(
                 "Row Number",
                 min_value=1,
                 max_value=total_rows,
-                value=1,
-                step=1
+                value=st.session_state.get("row_number", 1),
+                step=1,
+                key="row_number"
             )
 
-            # 🔥 Convert to 0-based index
             row_index = row_number - 1
-
             X_single = X_test.iloc[[row_index]]
 
-            # Optional preview
             st.markdown("### Selected Row Preview")
             st.dataframe(X_single)
 
             _, fig_local = generate_shap_plots(model, X_sample, X_single)
-
             st.pyplot(fig_local)
 
     else:
