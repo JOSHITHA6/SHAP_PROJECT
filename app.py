@@ -131,10 +131,10 @@ with col2:
         # ====================================================
         if task == "Classification":
             acc = accuracy_score(y_test, y_pred)
-            st.success(f"Accuracy: {round(acc*100,2)}%")
+            st.success(f"Accuracy: {round(acc * 100, 2)}%")
         else:
             score = r2_score(y_test, y_pred)
-            st.success(f"R² Score: {round(score,3)}")
+            st.success(f"R² Score: {round(score, 3)}")
 
         # ====================================================
         # SHAP
@@ -146,60 +146,109 @@ with col2:
         tab1, tab2 = st.tabs(["🌍 Global Explanation", "🔍 Local Explanation"])
 
         # ====================================================
-        # 🌍 GLOBAL (BAR PLOT + INSIGHTS)
+        # GLOBAL
         # ====================================================
         with tab1:
+
+            plot_type = st.selectbox(
+                "Select Global Explanation Graph",
+                ["Bar", "Beeswarm", "Violin"],
+                index=0
+            )
 
             explainer = shap.TreeExplainer(model)
             shap_values = explainer(X_sample, check_additivity=False)
 
-            # -------- Mean SHAP ----------
+            feature_names = X_sample.columns
+
+            # ---------- PLOT ----------
+            if plot_type == "Bar":
+                abs_shap = np.abs(shap_values.values).mean(axis=0)
+
+                fig = plt.figure()
+                idx = np.argsort(abs_shap)
+
+                plt.barh(feature_names[idx], abs_shap[idx])
+                plt.xlabel("Mean |SHAP Value| (Impact)")
+                plt.title("Feature Importance (Global)")
+
+                st.pyplot(fig)
+
+            elif plot_type == "Beeswarm":
+                fig = plt.figure()
+                shap.plots.beeswarm(shap_values, show=False)
+                st.pyplot(fig)
+
+            elif plot_type == "Violin":
+                fig = plt.figure()
+                shap.summary_plot(shap_values, X_sample, plot_type="violin", show=False)
+                st.pyplot(fig)
+
+            # ---------- INSIGHTS ----------
             mean_shap = shap_values.values.mean(axis=0)
             abs_shap = np.abs(shap_values.values).mean(axis=0)
 
-            feature_names = X_sample.columns
-
-            # -------- BAR PLOT ----------
-            fig_bar = plt.figure()
-            sorted_idx = np.argsort(abs_shap)
-
-            plt.barh(feature_names[sorted_idx], abs_shap[sorted_idx])
-            plt.xlabel("Mean |SHAP Value| (Impact)")
-            plt.title("Feature Importance (Global)")
-            st.pyplot(fig_bar)
-
-            # -------- PERCENT ----------
             total = abs_shap.sum()
-            percent_contribution = (abs_shap / total) * 100
+            percent = (abs_shap / total) * 100
 
-            # -------- TOP K ----------
             TOP_K = 5
-            sorted_idx_desc = np.argsort(abs_shap)[::-1][:TOP_K]
+            top_idx = np.argsort(abs_shap)[::-1][:TOP_K]
 
             st.markdown("### 📌 Key Feature Insights")
 
-            for i in sorted_idx_desc:
-                feature = feature_names[i]
+            for i in top_idx:
+                feat = feature_names[i]
                 direction = mean_shap[i]
-                percent = percent_contribution[i]
+                pct = percent[i]
 
-                if direction > 0:
-                    st.write(f"🔺 {feature}: **{percent:.1f}%** contribution → increases prediction")
+                pos_ratio = (shap_values.values[:, i] > 0).mean()
+
+                if pos_ratio > 0.6:
+                    trend = "mostly increases"
+                elif pos_ratio < 0.4:
+                    trend = "mostly decreases"
                 else:
-                    st.write(f"🔻 {feature}: **{percent:.1f}%** contribution → decreases prediction")
+                    trend = "mixed effect"
 
-            # -------- GUIDE ----------
+                arrow = "🔺" if direction > 0 else "🔻"
+                dir_text = "increases" if direction > 0 else "decreases"
+
+                st.write(
+                    f"{arrow} **{feat}**: {pct:.1f}% contribution → "
+                    f"{dir_text} prediction (**{trend}**)"
+                )
+
+            # ---------- GUIDE ----------
+            st.markdown("### 📈 How to Read This")
+
+            if plot_type == "Bar":
+                st.markdown("""
+- Bars show feature importance  
+- Higher = more impact  
+- Does not show direction  
+""")
+
+            elif plot_type == "Beeswarm":
+                st.markdown("""
+- Each dot = data point  
+- Right → increases prediction  
+- Left → decreases prediction  
+- Red = high value, Blue = low  
+""")
+
+            elif plot_type == "Violin":
+                st.markdown("""
+- Shows distribution of feature impact  
+- Wider = more frequent  
+""")
+
             st.markdown("""
-### 📈 Interpretation Guide
-
-- Bars show how important each feature is  
-- Percentage shows contribution strength  
-- 🔺 means increases prediction  
-- 🔻 means decreases prediction  
+📌 Direction is averaged across dataset.  
+Feature can both increase and decrease depending on case.
 """)
 
         # ====================================================
-        # 🔍 LOCAL
+        # LOCAL
         # ====================================================
         with tab2:
 
@@ -208,8 +257,6 @@ with col2:
             st.markdown(f"""
 📊 Total rows in dataset: **{len(df)}**  
 🧪 Rows used for SHAP (test set): **{total_rows}**
-
-Select row from **test dataset** (1 to {total_rows})
 """)
 
             row_number = st.number_input(
