@@ -3,18 +3,21 @@ import matplotlib.pyplot as plt
 
 def generate_shap_plots(model, X_sample, X_single=None):
 
-    explainer = shap.Explainer(model, X_sample)
+    # Use TreeExplainer explicitly (more stable)
+    explainer = shap.TreeExplainer(model)
 
     # GLOBAL
-    shap_values = explainer(X_sample)
+    shap_values = explainer(X_sample, check_additivity=False)
+
     fig_global = plt.figure()
-    shap.plots.beeswarm(shap_values, show=False)
+    shap.summary_plot(shap_values, X_sample, show=False)
 
     fig_local = None
 
-    # LOCAL (only if row selected)
+    # LOCAL
     if X_single is not None:
-        shap_single = explainer(X_single)
+        shap_single = explainer(X_single, check_additivity=False)
+
         fig_local = plt.figure()
         shap.plots.waterfall(shap_single[0], show=False)
 
