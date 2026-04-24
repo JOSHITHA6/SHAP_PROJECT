@@ -9,10 +9,7 @@ def train_model(X_train, y_train, task, model_type):
             model = RandomForestClassifier(class_weight='balanced')
 
         elif model_type == "Logistic Regression":
-            model = LogisticRegression(max_iter=1000, class_weight='balanced')
-
-        else:
-            raise ValueError("Invalid model for classification")
+            model = LogisticRegression(max_iter=1000)
 
     else:
 
@@ -21,9 +18,6 @@ def train_model(X_train, y_train, task, model_type):
 
         elif model_type == "Linear Regression":
             model = LinearRegression()
-
-        else:
-            raise ValueError("Invalid model for regression")
 
     model.fit(X_train, y_train)
     return model
