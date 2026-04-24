@@ -1,39 +1,35 @@
 import shap
 import matplotlib.pyplot as plt
-import numpy as np
 
 def generate_shap_plots(model, X_sample, X_single=None):
 
-    # ================= AUTO EXPLAINER =================
+    # Choose explainer
     if hasattr(model, "estimators_"):
-        # Tree-based models
         explainer = shap.TreeExplainer(model)
-        shap_values = explainer(X_sample)
-
     else:
-        # Linear / Logistic models
         explainer = shap.LinearExplainer(model, X_sample)
-        shap_values = explainer(X_sample)
 
-    # ================= GLOBAL PLOT =================
+    shap_values = explainer(X_sample)
+
+    # ===== GLOBAL =====
+    plt.close('all')
     fig_global = plt.figure()
 
     shap.summary_plot(
-        shap_values.values,
+        shap_values,
         X_sample,
+        plot_type="violin",
         show=False
     )
 
-    # ================= LOCAL PLOT =================
+    plt.xlabel("SHAP value (impact on prediction)")
+    plt.ylabel("Features")
+
+    # ===== LOCAL =====
     fig_local = None
 
     if X_single is not None:
-
-        # Recompute SHAP for single row
-        if hasattr(model, "estimators_"):
-            shap_single = shap.TreeExplainer(model)(X_single)
-        else:
-            shap_single = shap.LinearExplainer(model, X_sample)(X_single)
+        shap_single = explainer(X_single)
 
         fig_local = plt.figure()
 
@@ -41,7 +37,7 @@ def generate_shap_plots(model, X_sample, X_single=None):
             shap.Explanation(
                 values=shap_single.values[0],
                 base_values=shap_single.base_values[0],
-                data=X_single.iloc[0]
+                data=X_single[0]
             ),
             show=False
         )
