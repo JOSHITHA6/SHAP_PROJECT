@@ -12,14 +12,19 @@ from sklearn.metrics import (
     r2_score, mean_absolute_error, mean_squared_error
 )
 
+# ================= CONFIG =================
 st.set_page_config(layout="wide")
 st.title("SHAP- AI MODEL EXPLAINABILITY TOOL")
 
-# ================= LAYOUT =================
-col1, col2 = st.columns([1,1])
+# ================= PAGE STATE =================
+if "page" not in st.session_state:
+    st.session_state["page"] = "input"
 
-# ================= LEFT: INPUT =================
-with col1:
+# =========================================================
+# ======================= PAGE 1 ===========================
+# ======================= INPUT ============================
+# =========================================================
+if st.session_state["page"] == "input":
 
     st.subheader("📥 Input Panel")
 
@@ -28,8 +33,8 @@ with col1:
     if file:
         df = pd.read_csv(file)
         st.session_state["df"] = df
-
-    df = st.session_state.get("df", None)
+    else:
+        df = None
 
     if df is not None:
 
@@ -43,12 +48,18 @@ with col1:
 
         st.write(f"Detected Task: {task}")
 
+        # Model selection
         if task == "Classification":
             model_type = st.selectbox("Model", ["Random Forest", "Logistic Regression"])
         else:
             model_type = st.selectbox("Model", ["Random Forest", "Linear Regression"])
 
-        if st.button("🚀 Run Model"):
+        # ================= VALIDATION =================
+        ready = target is not None and model_type is not None
+
+        run_btn = st.button("🚀 Run Model", disabled=not ready)
+
+        if run_btn:
 
             (
                 X_train, X_test,
@@ -60,20 +71,33 @@ with col1:
 
             model = train_model(X_train, y_train, task, model_type)
 
+            # Save everything
             st.session_state.update({
                 "model": model,
                 "X_test": X_test,
                 "y_test": y_test,
-                "X_test_original": X_test_original,
+                "X_test_original": X_test_original.reset_index(drop=True),
                 "preprocessor": preprocessor,
                 "feature_cols": feature_cols,
                 "task": task
             })
 
-# ================= RIGHT: OUTPUT =================
-with col2:
+            # 🔥 SWITCH PAGE
+            st.session_state["page"] = "output"
+            st.rerun()
+
+# =========================================================
+# ======================= PAGE 2 ===========================
+# ======================= OUTPUT ===========================
+# =========================================================
+elif st.session_state["page"] == "output":
 
     st.subheader("📊 Output Panel")
+
+    # Back button
+    if st.button("⬅️ Back to Input"):
+        st.session_state["page"] = "input"
+        st.rerun()
 
     if "model" in st.session_state:
 
@@ -83,7 +107,7 @@ with col2:
         X_test_original = st.session_state["X_test_original"]
         task = st.session_state["task"]
 
-        # ================= SHOW TEST DATA =================
+        # ================= TEST DATA =================
         st.markdown("### 📄 Test Dataset (20%)")
         st.dataframe(X_test_original)
 
@@ -138,7 +162,12 @@ with col2:
                 for col in st.session_state["feature_cols"]:
                     input_data[col] = st.number_input(f"{col}", key=col)
 
-                if st.button("Predict"):
+                # Enable only if all filled
+                filled = all(v is not None for v in input_data.values())
+
+                predict_btn = st.button("Predict", disabled=not filled)
+
+                if predict_btn:
 
                     new_df = pd.DataFrame([input_data])
                     new_processed = st.session_state["preprocessor"].transform(new_df)
@@ -151,4 +180,4 @@ with col2:
                     st.pyplot(fig_local)
 
     else:
-        st.info("Upload dataset and click Run Model")
+        st.warning("No model found. Go back and run again.")
