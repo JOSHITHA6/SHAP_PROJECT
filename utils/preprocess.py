@@ -32,11 +32,19 @@ def preprocess_data(df, target_col):
         X, y, test_size=0.2, random_state=42, shuffle=True
     )
 
+    # Reset index (UI clarity)
     X_test = X_test.reset_index(drop=True)
     y_test = y_test.reset_index(drop=True)
 
+    # Transform
     X_train_processed = preprocessor.fit_transform(X_train)
     X_test_processed = preprocessor.transform(X_test)
+
+    # 🔥 IMPORTANT: get transformed feature names
+    feature_names = preprocessor.get_feature_names_out()
+
+    # 🔥 Clean names (remove num__ / cat__)
+    feature_names = [name.split("__")[-1] for name in feature_names]
 
     return (
         X_train_processed,
@@ -45,5 +53,5 @@ def preprocess_data(df, target_col):
         y_test,
         X_test,
         preprocessor,
-        list(X.columns)
+        feature_names   # ✅ FIXED
     )
