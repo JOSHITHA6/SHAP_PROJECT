@@ -99,8 +99,8 @@ with col2:
 
             plot_type = st.selectbox(
                 "Graph Type",
-                ["Violin"]
-                '''["Bar", "Beeswarm", "Violin"]'''
+                ["Violin"],
+                #["Bar", "Beeswarm", "Violin"]
             )
 
             # ================= EXPLAINER =================
