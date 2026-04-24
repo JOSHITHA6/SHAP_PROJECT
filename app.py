@@ -13,17 +13,14 @@ from sklearn.metrics import accuracy_score, r2_score
 st.set_page_config(layout="wide")
 
 # ====================================================
-# 🎨 CSS (ALIGNMENT FIXED)
+# CSS
 # ====================================================
 st.markdown("""
 <style>
-
-/* Background */
 .stApp {
     background-color: #f8fafc;
 }
 
-/* Section Box */
 .section-box {
     background: white;
     padding: 20px;
@@ -32,20 +29,17 @@ st.markdown("""
     height: 100%;
 }
 
-/* Divider */
 .divider {
     border-left: 2px solid #e2e8f0;
     height: 100%;
     margin: auto;
 }
 
-/* FORCE TOP ALIGNMENT */
 [data-testid="column"] > div {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -55,7 +49,7 @@ st.markdown("""
 st.title("📊 SHAP Explainability Tool")
 
 # ====================================================
-# LAYOUT (WITH GAP)
+# LAYOUT
 # ====================================================
 col1, col_gap, col2 = st.columns([1, 0.08, 1])
 
@@ -73,7 +67,9 @@ with col1:
     df = None
     if file:
         df = pd.read_csv(file)
-        st.dataframe(df.head())
+
+        # 🔥 SHOW FULL DATASET (SCROLLABLE)
+        st.dataframe(df, use_container_width=True, height=400)
 
         target = st.selectbox("Select Target Column", df.columns)
 
@@ -107,17 +103,15 @@ with col2:
 
         with st.spinner("Running model + SHAP... ⏳"):
 
-            # -------- PREPROCESS --------
+            # PREPROCESS
             X_train, X_test, y_train, y_test = preprocess_data(df, target)
 
-            # -------- MODEL --------
+            # MODEL
             model = train_model(X_train, y_train, task, model_type)
 
             y_pred = model.predict(X_test)
 
-        # -------- METRICS --------
-        st.markdown('<div style="margin-top:0px;">', unsafe_allow_html=True)
-
+        # METRICS
         if task == "Classification":
             acc = accuracy_score(y_test, y_pred)
             st.success(f"Accuracy: {round(acc*100,2)}%")
@@ -125,46 +119,43 @@ with col2:
             score = r2_score(y_test, y_pred)
             st.success(f"R² Score: {round(score,3)}")
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # ====================================================
-        # 🔥 NEW: ROW SELECTION (ONLY ADDITION)
-        # ====================================================
-        st.markdown("### 🔎 Select Row for Local Explanation")
-
-        row_index = st.number_input(
-            "Enter row index",
-            min_value=0,
-            max_value=len(X_test)-1,
-            value=0,
-            step=1
-        )
-
-        # ====================================================
-        # SHAP
-        # ====================================================
+        # SHAP TITLE
         st.markdown("## 🔍 SHAP Explanation")
 
-        # GLOBAL
+        # GLOBAL SAMPLE
         X_sample = X_test.iloc[:30]
 
-        # LOCAL (selected row)
-        X_single = X_test.iloc[[row_index]]
-
-        # UPDATED CALL
-        fig_global, fig_local = generate_shap_plots(
-            model,
-            X_sample,
-            X_single
-        )
-
-        # -------- TABS --------
+        # TABS
         tab1, tab2 = st.tabs(["🌍 Global Explanation", "🔍 Local Explanation"])
 
+        # ====================================================
+        # 🌍 GLOBAL
+        # ====================================================
         with tab1:
+            fig_global, _ = generate_shap_plots(model, X_sample, None)
             st.pyplot(fig_global)
 
+        # ====================================================
+        # 🔍 LOCAL (WITH ROW SELECTION)
+        # ====================================================
         with tab2:
+
+            total_rows = len(X_test)
+
+            st.markdown(f"Select row between **0 and {total_rows-1}**")
+
+            row_index = st.number_input(
+                "Row Index",
+                min_value=0,
+                max_value=total_rows - 1,
+                value=0,
+                step=1
+            )
+
+            X_single = X_test.iloc[[row_index]]
+
+            _, fig_local = generate_shap_plots(model, X_sample, X_single)
+
             st.pyplot(fig_local)
 
     else:
