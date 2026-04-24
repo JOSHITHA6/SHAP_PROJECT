@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import shap
+import matplotlib.pyplot as plt
 
 from utils.preprocess import preprocess_data
 from BACKEND.model import train_model
@@ -14,15 +15,24 @@ from sklearn.metrics import (
 st.set_page_config(layout="wide")
 st.title("SHAP- AI MODEL EXPLAINABILITY TOOL")
 
-col1, col2 = st.columns(2)
+# ================= LAYOUT =================
+col1, col2 = st.columns([1,1])
 
-# ================= LEFT =================
+# ================= LEFT: INPUT =================
 with col1:
+
+    st.subheader("📥 Input Panel")
 
     file = st.file_uploader("Upload CSV", type=["csv"])
 
     if file:
         df = pd.read_csv(file)
+        st.session_state["df"] = df
+
+    df = st.session_state.get("df", None)
+
+    if df is not None:
+
         target = st.selectbox("Target Column", df.columns)
 
         # Auto detect task
@@ -38,7 +48,7 @@ with col1:
         else:
             model_type = st.selectbox("Model", ["Random Forest", "Linear Regression"])
 
-        if st.button("Run Model"):
+        if st.button("🚀 Run Model"):
 
             (
                 X_train, X_test,
@@ -60,17 +70,26 @@ with col1:
                 "task": task
             })
 
-# ================= RIGHT =================
+# ================= RIGHT: OUTPUT =================
 with col2:
+
+    st.subheader("📊 Output Panel")
 
     if "model" in st.session_state:
 
         model = st.session_state["model"]
         X_test = st.session_state["X_test"]
         y_test = st.session_state["y_test"]
+        X_test_original = st.session_state["X_test_original"]
         task = st.session_state["task"]
 
-        # ===== PREDICTIONS =====
+        # ================= SHOW TEST DATA =================
+        st.markdown("### 📄 Test Dataset (20%)")
+        st.dataframe(X_test_original)
+
+        # ================= METRICS =================
+        st.markdown("### 📈 Model Performance")
+
         if task == "Classification":
             y_pred = model.predict(X_test)
 
@@ -84,42 +103,52 @@ with col2:
 
             st.success(f"R²: {r2_score(y_test, y_pred):.2f}")
             st.write(f"MAE: {mean_absolute_error(y_test, y_pred):.2f}")
-            st.write(f"RMSE: {mean_squared_error(y_test, y_pred)**0.5:.2f}")
+            st.write(f"RMSE: {(mean_squared_error(y_test, y_pred))**0.5:.2f}")
 
-        st.markdown("## 🔍 Global SHAP")
+        # ================= TABS =================
+        tab1, tab2 = st.tabs(["🌍 Global Explainability", "🔍 Local Explainability"])
 
-        fig_global, _ = generate_shap_plots(model, X_test)
-        st.pyplot(fig_global)
+        # ================= GLOBAL =================
+        with tab1:
+            st.markdown("### SHAP Global Explanation")
 
-        # ===== LOCAL =====
-        st.markdown("## 🔍 Local Explanation")
+            fig_global, _ = generate_shap_plots(model, X_test)
+            st.pyplot(fig_global)
 
-        option = st.radio("Choose Option", ["Select Row", "Enter New Data"])
+        # ================= LOCAL =================
+        with tab2:
 
-        if option == "Select Row":
-            row = st.number_input("Row", 1, len(X_test), 1)
-            X_single = X_test[row-1:row]
+            option = st.radio("Choose Option", ["Select Row", "Enter New Data"])
 
-            _, fig_local = generate_shap_plots(model, X_test, X_single)
-            st.pyplot(fig_local)
+            # -------- OPTION A --------
+            if option == "Select Row":
+                row = st.number_input("Row Number", 1, len(X_test), 1)
 
-        else:
-            st.markdown("### Enter Feature Values")
+                X_single = X_test[row-1:row]
 
-            input_data = {}
-
-            for col in st.session_state["feature_cols"]:
-                if col != st.session_state["feature_cols"][-1]:
-                    input_data[col] = st.number_input(col)
-
-            if st.button("Predict"):
-
-                new_df = pd.DataFrame([input_data])
-                new_processed = st.session_state["preprocessor"].transform(new_df)
-
-                pred = model.predict(new_processed)
-
-                st.success(f"Prediction: {pred[0]}")
-
-                _, fig_local = generate_shap_plots(model, X_test, new_processed)
+                _, fig_local = generate_shap_plots(model, X_test, X_single)
                 st.pyplot(fig_local)
+
+            # -------- OPTION B --------
+            else:
+                st.markdown("### ✏️ Enter New Data")
+
+                input_data = {}
+
+                for col in st.session_state["feature_cols"]:
+                    input_data[col] = st.number_input(f"{col}", key=col)
+
+                if st.button("Predict"):
+
+                    new_df = pd.DataFrame([input_data])
+                    new_processed = st.session_state["preprocessor"].transform(new_df)
+
+                    pred = model.predict(new_processed)
+
+                    st.success(f"Prediction: {pred[0]}")
+
+                    _, fig_local = generate_shap_plots(model, X_test, new_processed)
+                    st.pyplot(fig_local)
+
+    else:
+        st.info("Upload dataset and click Run Model")
