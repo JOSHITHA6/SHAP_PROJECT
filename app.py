@@ -10,17 +10,14 @@ from sklearn.metrics import (
     r2_score, mean_absolute_error, mean_squared_error
 )
 
-# ================= CONFIG =================
 st.set_page_config(layout="wide")
 st.title("Explainable AI Dashboard (SHAP-Based Insights)")
 
-# ================= SESSION STATE =================
+# ================= SESSION =================
 if "page" not in st.session_state:
     st.session_state.page = "input"
 
-# =========================================================
-# ======================= INPUT PAGE =======================
-# =========================================================
+# ================= INPUT PAGE =================
 if st.session_state.page == "input":
 
     st.subheader("📥 Input Panel")
@@ -29,7 +26,6 @@ if st.session_state.page == "input":
 
     if file:
         df = pd.read_csv(file)
-        st.session_state.df = df
     else:
         df = None
 
@@ -68,18 +64,15 @@ if st.session_state.page == "input":
                 "X_test": X_test,
                 "y_test": y_test,
                 "test_display": test_display,
-                "preprocessor": preprocessor,
                 "feature_names": feature_names,
                 "task": task,
-                "target": target
+                "preprocessor": preprocessor
             })
 
             st.session_state.page = "output"
             st.rerun()
 
-# =========================================================
-# ======================= OUTPUT PAGE ======================
-# =========================================================
+# ================= OUTPUT PAGE =================
 elif st.session_state.page == "output":
 
     if st.button("⬅️ Back"):
@@ -91,21 +84,18 @@ elif st.session_state.page == "output":
     y_test = st.session_state.y_test
     test_display = st.session_state.test_display
     feature_names = st.session_state.feature_names
-    preprocessor = st.session_state.preprocessor
     task = st.session_state.task
-    target = st.session_state.target
+    preprocessor = st.session_state.preprocessor
 
-    # ================= LAYOUT =================
+    # Layout
     left, spacer, right = st.columns([1.1, 0.1, 1.4])
 
     # ================= LEFT =================
     with left:
-
         st.markdown("### 📄 Test Dataset (20%)")
         st.dataframe(test_display, height=350)
 
         st.markdown("---")
-
         st.markdown("### 📈 Model Performance")
 
         y_pred = model.predict(X_test)
@@ -127,52 +117,41 @@ elif st.session_state.page == "output":
 
         tab1, tab2 = st.tabs(["🌍 Global Explainability", "🔍 Local Explainability"])
 
-        # ================= GLOBAL =================
+        # GLOBAL
         with tab1:
-
             with st.spinner("Generating SHAP..."):
                 fig_global, _ = generate_shap_plots(
                     model,
                     X_test[:100],
                     feature_names=feature_names
                 )
-
             st.pyplot(fig_global)
 
-        # ================= LOCAL =================
+        # LOCAL
         with tab2:
 
-            option = st.radio(
-                "Choose Option",
-                ["Select Row", "Enter New Data"]
-            )
+            option = st.radio("Choose Option", ["Select Row", "Enter New Data"])
 
-            # -------- OPTION 1: SELECT ROW --------
             if option == "Select Row":
 
                 row = st.number_input("Row Number", 1, len(X_test), 1)
 
                 X_single = X_test[row-1:row]
 
-                # 🔥 ORIGINAL VALUES (NO SCALING SHOWN)
-                original_row = test_display.iloc[row-1:row].drop(columns=[target])
-
                 _, fig_local = generate_shap_plots(
                     model,
                     X_test[:100],
                     X_single,
-                    feature_names=feature_names,
-                    original_row=original_row
+                    feature_names=feature_names
                 )
 
                 st.pyplot(fig_local)
 
-            # -------- OPTION 2: ENTER NEW DATA --------
             else:
 
                 st.info("Fill all fields and click Predict")
 
-                with st.form("manual_input_form"):
+                with st.form("input_form"):
 
                     input_data = {}
                     cols = st.columns(2)
@@ -184,36 +163,24 @@ elif st.session_state.page == "output":
                     submit = st.form_submit_button("Predict")
 
                     if submit:
+                        try:
+                            input_data = {k: float(v) for k, v in input_data.items()}
+                            new_df = pd.DataFrame([input_data])
 
-                        if any(v.strip() == "" for v in input_data.values()):
-                            st.error("⚠️ Please fill all fields")
-                        else:
-                            try:
-                                # Convert input
-                                for k in input_data:
-                                    input_data[k] = float(input_data[k])
+                            new_processed = preprocessor.transform(new_df)
 
-                                new_df = pd.DataFrame([input_data])
+                            pred = model.predict(new_processed)
 
-                                # 🔥 Keep original for display
-                                original_row = new_df.copy()
+                            st.success(f"Prediction: {pred[0]}")
 
-                                # 🔥 Transform only for model
-                                new_processed = preprocessor.transform(new_df)
+                            _, fig_local = generate_shap_plots(
+                                model,
+                                X_test[:100],
+                                new_processed,
+                                feature_names=feature_names
+                            )
 
-                                pred = model.predict(new_processed)
+                            st.pyplot(fig_local)
 
-                                st.success(f"Prediction: {pred[0]}")
-
-                                _, fig_local = generate_shap_plots(
-                                    model,
-                                    X_test[:100],
-                                    new_processed,
-                                    feature_names=feature_names,
-                                    original_row=original_row
-                                )
-
-                                st.pyplot(fig_local)
-
-                            except:
-                                st.error("⚠️ Enter valid numeric values")
+                        except:
+                            st.error("Enter valid numeric values")
