@@ -12,9 +12,8 @@ from sklearn.metrics import (
     r2_score, mean_absolute_error, mean_squared_error
 )
 
-# ================= CONFIG =================
 st.set_page_config(layout="wide")
-st.title("SHAP- AI MODEL EXPLAINABILITY TOOL")
+st.title("Explainable AI Dashboard (SHAP-Based Insights)")
 
 # ================= PAGE STATE =================
 if "page" not in st.session_state:
@@ -52,7 +51,6 @@ if st.session_state["page"] == "input":
         else:
             model_type = st.selectbox("Model", ["Random Forest", "Linear Regression"])
 
-        # Enable Run only when ready
         ready = target is not None and model_type is not None
 
         if st.button("🚀 Run Model", disabled=not ready):
@@ -67,7 +65,6 @@ if st.session_state["page"] == "input":
 
             model = train_model(X_train, y_train, task, model_type)
 
-            # Combine test + target for display
             test_display = X_test_original.copy()
             test_display[target] = y_test.values
             test_display = test_display.reset_index(drop=True)
@@ -104,7 +101,6 @@ elif st.session_state["page"] == "output":
     feature_cols = st.session_state["feature_cols"]
     preprocessor = st.session_state["preprocessor"]
     task = st.session_state["task"]
-    target = st.session_state["target"]
 
     # ================= TEST DATA =================
     st.markdown("### 📄 Test Dataset (20%)")
@@ -130,7 +126,6 @@ elif st.session_state["page"] == "output":
 
     # ================= GLOBAL =================
     with tab1:
-
         fig_global, _ = generate_shap_plots(model, X_test)
         st.pyplot(fig_global)
 
@@ -141,44 +136,52 @@ elif st.session_state["page"] == "output":
 
         # -------- OPTION A --------
         if option == "Select Row":
-
             row = st.number_input("Row Number", 1, len(X_test), 1)
-
             X_single = X_test[row-1:row]
-
             _, fig_local = generate_shap_plots(model, X_test, X_single)
             st.pyplot(fig_local)
 
         # -------- OPTION B --------
         else:
 
-            st.markdown("### ✏️ Enter New Data")
+            st.info("Fill all fields and click Predict")
 
-            # 🔥 FORM (NO FLICKER)
             with st.form("manual_input_form"):
 
                 input_data = {}
 
+                cols = st.columns(2)
+
                 for i, col in enumerate(feature_cols):
-                    input_data[col] = st.number_input(
-                        f"Feature {i+1}",
-                        key=f"input_{col}"
-                    )
+                    with cols[i % 2]:
+                        input_data[col] = st.text_input(
+                            f"Feature {i+1}",
+                            placeholder="Enter value"
+                        )
 
                 submitted = st.form_submit_button("Predict")
 
                 if submitted:
 
-                    new_df = pd.DataFrame([input_data])
+                    # Validation
+                    if any(v.strip() == "" for v in input_data.values()):
+                        st.error("⚠️ Please fill all fields")
+                    else:
+                        try:
+                            for k in input_data:
+                                input_data[k] = float(input_data[k])
 
-                    # Ensure correct column order
-                    new_df = new_df[feature_cols]
+                            new_df = pd.DataFrame([input_data])
+                            new_df = new_df[feature_cols]
 
-                    new_processed = preprocessor.transform(new_df)
+                            new_processed = preprocessor.transform(new_df)
 
-                    pred = model.predict(new_processed)
+                            pred = model.predict(new_processed)
 
-                    st.success(f"Prediction: {pred[0]}")
+                            st.success(f"Prediction: {pred[0]}")
 
-                    _, fig_local = generate_shap_plots(model, X_test, new_processed)
-                    st.pyplot(fig_local)
+                            _, fig_local = generate_shap_plots(model, X_test, new_processed)
+                            st.pyplot(fig_local)
+
+                        except:
+                            st.error("⚠️ Enter valid numeric values")
