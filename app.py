@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-import shap
-import matplotlib.pyplot as plt
 
 from utils.preprocess import preprocess_data
 from BACKEND.model import train_model
@@ -12,6 +10,7 @@ from sklearn.metrics import (
     r2_score, mean_absolute_error, mean_squared_error
 )
 
+# ================= CONFIG =================
 st.set_page_config(layout="wide")
 st.title("Explainable AI Dashboard (SHAP-Based Insights)")
 
@@ -65,6 +64,7 @@ if st.session_state["page"] == "input":
 
             model = train_model(X_train, y_train, task, model_type)
 
+            # Combine test data with target
             test_display = X_test_original.copy()
             test_display[target] = y_test.values
             test_display = test_display.reset_index(drop=True)
@@ -88,8 +88,6 @@ if st.session_state["page"] == "input":
 # =========================================================
 elif st.session_state["page"] == "output":
 
-    st.subheader("📊 Output Panel")
-
     if st.button("⬅️ Back"):
         st.session_state["page"] = "input"
         st.rerun()
@@ -102,86 +100,98 @@ elif st.session_state["page"] == "output":
     preprocessor = st.session_state["preprocessor"]
     task = st.session_state["task"]
 
-    # ================= TEST DATA =================
-    st.markdown("### 📄 Test Dataset (20%)")
-    st.dataframe(test_display)
+    # ================= LAYOUT =================
+    left_col, right_col = st.columns([1, 1])
 
-    # ================= METRICS =================
-    st.markdown("### 📈 Model Performance")
+    # ================= LEFT SIDE =================
+    with left_col:
 
-    y_pred = model.predict(X_test)
+        st.markdown("### 📄 Test Dataset (20%)")
+        st.dataframe(test_display)
 
-    if task == "Classification":
-        st.success(f"Accuracy: {accuracy_score(y_test, y_pred):.2f}")
-        st.write(f"Precision: {precision_score(y_test, y_pred, zero_division=0):.2f}")
-        st.write(f"Recall: {recall_score(y_test, y_pred, zero_division=0):.2f}")
-        st.write(f"F1 Score: {f1_score(y_test, y_pred, zero_division=0):.2f}")
-    else:
-        st.success(f"R²: {r2_score(y_test, y_pred):.2f}")
-        st.write(f"MAE: {mean_absolute_error(y_test, y_pred):.2f}")
-        st.write(f"RMSE: {(mean_squared_error(y_test, y_pred))**0.5:.2f}")
+        st.divider()
 
-    # ================= TABS =================
-    tab1, tab2 = st.tabs(["🌍 Global Explainability", "🔍 Local Explainability"])
+        st.markdown("### 📈 Model Performance")
 
-    # ================= GLOBAL =================
-    with tab1:
-        fig_global, _ = generate_shap_plots(model, X_test)
-        st.pyplot(fig_global)
+        y_pred = model.predict(X_test)
 
-    # ================= LOCAL =================
-    with tab2:
-
-        option = st.radio("Choose Option", ["Select Row", "Enter New Data"])
-
-        # -------- OPTION A --------
-        if option == "Select Row":
-            row = st.number_input("Row Number", 1, len(X_test), 1)
-            X_single = X_test[row-1:row]
-            _, fig_local = generate_shap_plots(model, X_test, X_single)
-            st.pyplot(fig_local)
-
-        # -------- OPTION B --------
+        if task == "Classification":
+            st.success(f"Accuracy: {accuracy_score(y_test, y_pred):.2f}")
+            st.write(f"Precision: {precision_score(y_test, y_pred, zero_division=0):.2f}")
+            st.write(f"Recall: {recall_score(y_test, y_pred, zero_division=0):.2f}")
+            st.write(f"F1 Score: {f1_score(y_test, y_pred, zero_division=0):.2f}")
         else:
+            st.success(f"R²: {r2_score(y_test, y_pred):.2f}")
+            st.write(f"MAE: {mean_absolute_error(y_test, y_pred):.2f}")
+            st.write(f"RMSE: {(mean_squared_error(y_test, y_pred))**0.5:.2f}")
 
-            st.info("Fill all fields and click Predict")
+    # ================= RIGHT SIDE =================
+    with right_col:
 
-            with st.form("manual_input_form"):
+        tab1, tab2 = st.tabs(["🌍 Global Explainability", "🔍 Local Explainability"])
 
-                input_data = {}
+        # -------- GLOBAL --------
+        with tab1:
+            fig_global, _ = generate_shap_plots(model, X_test)
+            st.pyplot(fig_global)
 
-                cols = st.columns(2)
+        # -------- LOCAL --------
+        with tab2:
 
-                for i, col in enumerate(feature_cols):
-                    with cols[i % 2]:
-                        input_data[col] = st.text_input(
-                            f"Feature {i+1}",
-                            placeholder="Enter value"
-                        )
+            option = st.radio("Choose Option", ["Select Row", "Enter New Data"])
 
-                submitted = st.form_submit_button("Predict")
+            # OPTION A
+            if option == "Select Row":
 
-                if submitted:
+                row = st.number_input("Row Number", 1, len(X_test), 1)
 
-                    # Validation
-                    if any(v.strip() == "" for v in input_data.values()):
-                        st.error("⚠️ Please fill all fields")
-                    else:
-                        try:
-                            for k in input_data:
-                                input_data[k] = float(input_data[k])
+                X_single = X_test[row-1:row]
 
-                            new_df = pd.DataFrame([input_data])
-                            new_df = new_df[feature_cols]
+                _, fig_local = generate_shap_plots(model, X_test, X_single)
+                st.pyplot(fig_local)
 
-                            new_processed = preprocessor.transform(new_df)
+            # OPTION B
+            else:
 
-                            pred = model.predict(new_processed)
+                st.info("Fill all fields and click Predict")
 
-                            st.success(f"Prediction: {pred[0]}")
+                # 🔥 FORM (NO FLICKER)
+                with st.form("manual_input_form"):
 
-                            _, fig_local = generate_shap_plots(model, X_test, new_processed)
-                            st.pyplot(fig_local)
+                    input_data = {}
 
-                        except:
-                            st.error("⚠️ Enter valid numeric values")
+                    cols = st.columns(2)
+
+                    for i, col in enumerate(feature_cols):
+                        with cols[i % 2]:
+                            input_data[col] = st.text_input(
+                                col,  # ✅ ACTUAL FEATURE NAME
+                                placeholder="Enter value"
+                            )
+
+                    submitted = st.form_submit_button("Predict")
+
+                    if submitted:
+
+                        # Validation
+                        if any(v.strip() == "" for v in input_data.values()):
+                            st.error("⚠️ Please fill all fields")
+                        else:
+                            try:
+                                for k in input_data:
+                                    input_data[k] = float(input_data[k])
+
+                                new_df = pd.DataFrame([input_data])
+                                new_df = new_df[feature_cols]
+
+                                new_processed = preprocessor.transform(new_df)
+
+                                pred = model.predict(new_processed)
+
+                                st.success(f"Prediction: {pred[0]}")
+
+                                _, fig_local = generate_shap_plots(model, X_test, new_processed)
+                                st.pyplot(fig_local)
+
+                            except:
+                                st.error("⚠️ Enter valid numeric values")
