@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 
 def generate_shap_plots(model, X_sample, X_single=None):
 
-    # Choose explainer
     if hasattr(model, "estimators_"):
         explainer = shap.TreeExplainer(model)
     else:
@@ -11,8 +10,8 @@ def generate_shap_plots(model, X_sample, X_single=None):
 
     shap_values = explainer(X_sample)
 
-    # ===== GLOBAL =====
     plt.close('all')
+
     fig_global = plt.figure()
 
     shap.summary_plot(
@@ -25,7 +24,6 @@ def generate_shap_plots(model, X_sample, X_single=None):
     plt.xlabel("SHAP value (impact on prediction)")
     plt.ylabel("Features")
 
-    # ===== LOCAL =====
     fig_local = None
 
     if X_single is not None:
