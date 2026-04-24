@@ -123,7 +123,7 @@ with col2:
             feature_names = np.array(features)
 
             # ================= PLOTS =================
-            '''if plot_type == "Bar":'''
+            #if plot_type == "Bar":
             '''vals = np.abs(shap_array).mean(axis=0)
                 idx = np.argsort(vals)
 
@@ -132,7 +132,7 @@ with col2:
                 plt.title("Feature Importance")
                 st.pyplot(fig)'''
 
-            '''elif plot_type == "Beeswarm":'''
+            #elif plot_type == "Beeswarm":
             '''fig = plt.figure()
                 shap.plots.beeswarm(shap_values, show=False)
                 st.pyplot(fig)'''
