@@ -8,6 +8,7 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
     if not isinstance(X_sample, pd.DataFrame):
         X_sample = pd.DataFrame(X_sample, columns=feature_names)
 
+    # -------- EXPLAINER --------
     if hasattr(model, "estimators_"):
         explainer = shap.TreeExplainer(model)
     else:
@@ -15,18 +16,22 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
 
     shap_values = explainer(X_sample)
 
+    # -------- HANDLE CLASSIFICATION --------
     if isinstance(shap_values.values, np.ndarray) and len(shap_values.values.shape) == 3:
         shap_vals = shap_values.values[:, :, 1]
     else:
         shap_vals = shap_values.values
 
+    # -------- GLOBAL --------
     plt.close('all')
-
     fig_global = plt.figure()
-    shap.summary_plot(shap_vals, X_sample, plot_type="violin", show=False)
-    plt.xlabel("Impact on Prediction")
-    plt.ylabel("Features")
 
+    shap.summary_plot(shap_vals, X_sample, plot_type="violin", show=False)
+
+    plt.xlabel("Impact on Prediction", fontsize=12)
+    plt.ylabel("Features", fontsize=12)
+
+    # -------- LOCAL --------
     fig_local = None
 
     if X_single is not None:
@@ -43,17 +48,25 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
             values = shap_single.values[0]
             base = shap_single.base_values[0]
 
+        # 🔥 SORT + TAKE TOP FEATURES ONLY (removes grey confusion)
+        idx = np.argsort(np.abs(values))[::-1][:8]
+
+        values = values[idx]
+        names = np.array(feature_names)[idx]
+
         fig_local = plt.figure()
+
         shap.waterfall_plot(
             shap.Explanation(
                 values=values,
                 base_values=base,
-                feature_names=feature_names
+                feature_names=names
             ),
             show=False
         )
 
-        plt.xlabel("Impact on Prediction")
-        plt.ylabel("Features")
+        # 🔥 FORCE AXIS LABELS INSIDE GRAPH
+        plt.xlabel("Impact on Prediction", fontsize=12)
+        plt.ylabel("Features", fontsize=12)
 
     return fig_global, fig_local, shap_vals
