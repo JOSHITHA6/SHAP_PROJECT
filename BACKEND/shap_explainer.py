@@ -1,15 +1,10 @@
 import shap
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
-def generate_shap_plots(
-    model,
-    X_sample,
-    X_single=None,
-    feature_names=None
-):
+def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task="Regression"):
 
-    # Ensure DataFrame
     if not isinstance(X_sample, pd.DataFrame):
         X_sample = pd.DataFrame(X_sample, columns=feature_names)
 
@@ -21,20 +16,23 @@ def generate_shap_plots(
 
     shap_values = explainer(X_sample)
 
+    # 🔥 HANDLE CLASSIFICATION OUTPUT
+    if isinstance(shap_values.values, np.ndarray) and len(shap_values.values.shape) == 3:
+        shap_vals = shap_values.values[:, :, 1]  # class 1
+    else:
+        shap_vals = shap_values.values
+
     plt.close('all')
 
     # ===== GLOBAL =====
     fig_global = plt.figure()
 
     shap.summary_plot(
-        shap_values,
+        shap_vals,
         X_sample,
         plot_type="violin",
         show=False
     )
-
-    plt.xlabel("SHAP value (impact on prediction)")
-    plt.ylabel("Features")
 
     # ===== LOCAL =====
     fig_local = None
@@ -46,16 +44,22 @@ def generate_shap_plots(
 
         shap_single = explainer(X_single)
 
+        if isinstance(shap_single.values, np.ndarray) and len(shap_single.values.shape) == 3:
+            values = shap_single.values[0, :, 1]
+            base = shap_single.base_values[0, 1]
+        else:
+            values = shap_single.values[0]
+            base = shap_single.base_values[0]
+
         fig_local = plt.figure()
 
-        # ✅ FIX: DO NOT PASS original data (causes mismatch)
         shap.waterfall_plot(
             shap.Explanation(
-                values=shap_single.values[0],
-                base_values=shap_single.base_values[0],
+                values=values,
+                base_values=base,
                 feature_names=feature_names
             ),
             show=False
         )
 
-    return fig_global, fig_local
+    return fig_global, fig_local, shap_vals
