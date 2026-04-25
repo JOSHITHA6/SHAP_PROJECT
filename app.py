@@ -123,7 +123,19 @@ elif st.session_state.page == "output":
 
                 st.pyplot(fig)
 
-                st.markdown("### 📌 Global Insights")
+                # 🔥 Overall behavior (instead of wrong "prediction")
+                st.markdown("### 🎯 Overall Model Behavior")
+
+                mean_pred = model.predict(X_test).mean()
+
+                if task == "Classification":
+                    majority = (model.predict(X_test) == 1).mean()
+                    label = "YES" if majority >= 0.5 else "NO"
+                    st.success(f"👉 The model generally predicts: {label}")
+                else:
+                    st.success(f"👉 Average predicted value: {round(mean_pred, 3)}")
+
+                st.markdown("### 📌 Why this behavior?")
 
                 vals = np.abs(shap_vals).mean(axis=0)
                 perc = (vals / vals.sum()) * 100
@@ -154,38 +166,44 @@ elif st.session_state.page == "output":
 
                 row = st.number_input("Row Number", 1, len(X_test), 1)
 
-                # show selected row
                 st.markdown("### 📄 Selected Row Data")
                 st.dataframe(test_display.iloc[[row-1]])
 
                 X_single = X_test[row-1:row]
 
-                # 🔥 1. PREDICTION FIRST
+                # 🔥 PREDICTION + CONFIDENCE
                 pred = model.predict(X_single)[0]
+                actual = y_test.iloc[row-1]
 
                 st.markdown("### 🎯 Prediction")
 
                 if task == "Classification":
-                    st.success(f"{target}: {'YES' if pred == 1 else 'NO'}")
+
+                    if hasattr(model, "predict_proba"):
+                        prob = model.predict_proba(X_single)[0]
+                        confidence = np.max(prob)
+                    else:
+                        confidence = 0.7
+
+                    pred_label = "YES" if pred == 1 else "NO"
+                    actual_label = "YES" if actual == 1 else "NO"
+
+                    if pred == actual:
+                        st.success(f"✔ Predicted: {pred_label} (Confidence: {confidence:.2f})")
+                    else:
+                        st.warning(f"⚠️ Predicted: {pred_label} (Confidence: {confidence:.2f})")
+                        st.info(f"Actual: {actual_label}")
+
                 else:
-                    st.success(f"{target}: {round(pred, 3)}")
+                    st.success(f"Predicted: {round(pred,3)} | Actual: {round(actual,3)}")
 
-                # 🔥 2. METRIC (REFERENCE)
-                st.markdown("### 📈 Model Reliability")
-
-                if task == "Classification":
-                    st.info(f"Accuracy: {accuracy_score(y_test, model.predict(X_test)):.2f}")
-                else:
-                    st.info(f"R² Score: {r2_score(y_test, model.predict(X_test)):.2f}")
-
-                # 🔥 3. EXPLAINABILITY
+                # -------- EXPLAINABILITY --------
                 _, fig_local, shap_vals = generate_shap_plots(
                     model, X_test[:100], X_single, feature_names, task
                 )
 
                 st.pyplot(fig_local)
 
-                # axis labels (below graph)
                 st.markdown("**X-axis:** Impact on Prediction")
                 st.markdown("**Y-axis:** Features")
 
