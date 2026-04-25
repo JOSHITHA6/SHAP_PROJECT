@@ -12,11 +12,10 @@ st.set_page_config(layout="wide")
 
 root = st.container()
 
-# ---------------- STATE ----------------
 if "page" not in st.session_state:
     st.session_state.page = "input"
 
-# ================= INPUT PAGE =================
+# ================= INPUT =================
 if st.session_state.page == "input":
 
     with root:
@@ -63,14 +62,13 @@ if st.session_state.page == "input":
                     "y_test": y_test,
                     "test_display": test_display.reset_index(drop=True),
                     "feature_names": feature_names,
-                    "task": task,
-                    "target": target
+                    "task": task
                 })
 
                 st.session_state.page = "output"
                 st.rerun()
 
-# ================= OUTPUT PAGE =================
+# ================= OUTPUT =================
 elif st.session_state.page == "output":
 
     with root:
@@ -87,7 +85,6 @@ elif st.session_state.page == "output":
         test_display = st.session_state.test_display
         feature_names = st.session_state.feature_names
         task = st.session_state.task
-        target = st.session_state.target
 
         left, _, right = st.columns([1.1, 0.1, 1.4])
 
@@ -117,35 +114,40 @@ elif st.session_state.page == "output":
             with tab1:
 
                 fig, _, shap_vals = generate_shap_plots(
-                    model, X_test[:100], feature_names=feature_names, task=task
+                    model, X_test[:100], feature_names=feature_names
                 )
 
                 st.pyplot(fig)
 
-                st.markdown("### 🎯 Overall Model Behavior")
-
-                if task == "Classification":
-                    majority = (model.predict(X_test) == 1).mean()
-                    label = "YES" if majority >= 0.5 else "NO"
-                    st.success(f"👉 Model tends to predict: {label}")
-                else:
-                    avg = model.predict(X_test).mean()
-                    st.success(f"👉 Average prediction: {round(avg,3)}")
-
                 st.markdown("### 📌 Why this behavior?")
 
-                vals = np.abs(shap_vals).mean(axis=0)
+                # 🔥 FIX
+                vals = np.abs(shap_vals).mean(axis=0).flatten()
                 perc = (vals / vals.sum()) * 100
 
                 top_idx = np.argsort(vals)[::-1][:5]
 
                 for i in top_idx:
-                    direction = "increases" if np.mean(shap_vals[:, i]) > 0 else "decreases"
+
+                    i = int(i)  # 🔥 FIX
+
+                    mean_val = np.mean(shap_vals[:, i])
+
+                    if mean_val > 0:
+                        direction = "pushes prediction HIGHER"
+                        color = "green"
+                    elif mean_val < 0:
+                        direction = "pushes prediction LOWER"
+                        color = "red"
+                    else:
+                        direction = "has mixed impact"
+                        color = "gray"
 
                     st.markdown(f"""
-                    <div style="padding:10px;background:#f8f9fa;margin-bottom:8px;border-radius:8px;">
+                    <div style="padding:12px;margin-bottom:10px;background:#f8f9fa;border-radius:10px;border-left:6px solid {color};">
                     <b>{feature_names[i]}</b><br>
-                    {perc[i]:.1f}% contribution → {direction}
+                    👉 Contribution: <b>{perc[i]:.1f}%</b><br>
+                    👉 {direction}
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -154,44 +156,21 @@ elif st.session_state.page == "output":
 
                 row = st.number_input("Select Row", 1, len(X_test), 1)
 
-                st.markdown("### 📄 Selected Row Data")
                 st.dataframe(test_display.iloc[[row-1]])
 
                 X_single = X_test[row-1:row]
 
                 pred = model.predict(X_single)[0]
-                actual = y_test.iloc[row-1]
 
                 st.markdown("### 🎯 Prediction")
+                st.success(f"{pred}")
 
-                if task == "Classification":
-
-                    if hasattr(model, "predict_proba"):
-                        prob = model.predict_proba(X_single)[0]
-                        confidence = np.max(prob)
-                    else:
-                        confidence = 0.7
-
-                    pred_label = "YES" if pred == 1 else "NO"
-                    actual_label = "YES" if actual == 1 else "NO"
-
-                    if pred == actual:
-                        st.success(f"✔ {pred_label} (Confidence: {confidence:.2f})")
-                    else:
-                        st.warning(f"⚠️ {pred_label} (Confidence: {confidence:.2f})")
-                        st.info(f"Actual: {actual_label}")
-
-                else:
-                    st.success(f"{round(pred,3)} (Actual: {round(actual,3)})")
-
-                # SHAP LOCAL
                 _, fig_local, shap_vals = generate_shap_plots(
-                    model, X_test[:100], X_single, feature_names, task
+                    model, X_test[:100], X_single, feature_names
                 )
 
                 st.pyplot(fig_local)
 
-                # ✅ ADDED AS YOU ASKED
                 st.markdown("**X-axis = Impact on Prediction**")
                 st.markdown("**Y-axis = Features**")
 
@@ -202,5 +181,26 @@ elif st.session_state.page == "output":
                 vals = np.abs(shap_row)
                 perc = (vals / vals.sum()) * 100
 
-                for feat, val, p in sorted(zip(feature_names, shap_row, perc), key=lambda x: abs(x[1]), reverse=True)[:5]:
-                    st.markdown(f"{feat}: {p:.1f}% → {'increase' if val>0 else 'decrease'}")
+                for feat, val, p in sorted(
+                    zip(feature_names, shap_row, perc),
+                    key=lambda x: abs(x[1]),
+                    reverse=True
+                )[:5]:
+
+                    if val > 0:
+                        direction = "pushes prediction HIGHER"
+                        color = "green"
+                    elif val < 0:
+                        direction = "pushes prediction LOWER"
+                        color = "red"
+                    else:
+                        direction = "has minimal impact"
+                        color = "gray"
+
+                    st.markdown(f"""
+                    <div style="padding:12px;margin-bottom:10px;background:#f8f9fa;border-radius:10px;border-left:6px solid {color};">
+                    <b>{feat}</b><br>
+                    👉 Contribution: <b>{p:.1f}%</b><br>
+                    👉 {direction}
+                    </div>
+                    """, unsafe_allow_html=True)
