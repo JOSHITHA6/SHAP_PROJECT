@@ -163,9 +163,6 @@ elif st.session_state.page == "output":
 
                     st.pyplot(fig_local)
 
-                    st.markdown("**X-axis:** Impact on Prediction")
-                    st.markdown("**Y-axis:** Features")
-
                     st.markdown("### 📌 Why this prediction?")
 
                     shap_row = shap_vals[row-1]
@@ -208,12 +205,12 @@ elif st.session_state.page == "output":
 
                             with cols[i % 2]:
 
-                                dtype = df_full[col].dtype
+                                unique_vals = df_full[col].dropna().unique()
 
-                                if dtype == "object":
-                                    input_data[col] = st.selectbox(col, df_full[col].dropna().unique())
+                                if df_full[col].dtype == "object" or len(unique_vals) <= 10:
+                                    input_data[col] = st.selectbox(col, unique_vals)
 
-                                elif set(df_full[col].dropna().unique()).issubset({0,1}):
+                                elif set(unique_vals).issubset({0,1}):
                                     input_data[col] = st.selectbox(col, [0,1])
                                     st.caption("0 → Not Present, 1 → Present")
 
@@ -244,9 +241,6 @@ elif st.session_state.page == "output":
                             )
 
                             st.pyplot(fig_local)
-
-                            st.markdown("**X-axis:** Impact on Prediction")
-                            st.markdown("**Y-axis:** Features")
 
                         except:
                             st.error("⚠️ Enter valid numeric values")
