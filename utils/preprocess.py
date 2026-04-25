@@ -2,56 +2,28 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
 
-def preprocess_data(df, target_col):
+def preprocess_data(df, target):
 
-    X = df.drop(columns=[target_col])
-    y = df[target_col]
+    X = df.drop(columns=[target])
+    y = df[target]
 
-    num_cols = X.select_dtypes(include=['int64', 'float64']).columns
-    cat_cols = X.select_dtypes(include=['object', 'category']).columns
-
-    num_pipeline = Pipeline([
-        ("imputer", SimpleImputer(strategy="mean")),
-        ("scaler", StandardScaler())
-    ])
-
-    cat_pipeline = Pipeline([
-        ("imputer", SimpleImputer(strategy="most_frequent")),
-        ("encoder", OneHotEncoder(handle_unknown='ignore'))
-    ])
+    num_cols = X.select_dtypes(include=['int64','float64']).columns
+    cat_cols = X.select_dtypes(include=['object','category']).columns
 
     preprocessor = ColumnTransformer([
-        ("num", num_pipeline, num_cols),
-        ("cat", cat_pipeline, cat_cols)
+        ("num", StandardScaler(), num_cols),
+        ("cat", OneHotEncoder(handle_unknown='ignore'), cat_cols)
     ])
 
+    X_processed = preprocessor.fit_transform(X)
+
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, shuffle=True
+        X_processed, y, test_size=0.2, random_state=42
     )
 
-    # Reset index (UI clarity)
-    X_test = X_test.reset_index(drop=True)
-    y_test = y_test.reset_index(drop=True)
+    feature_names = list(preprocessor.get_feature_names_out())
 
-    # Transform
-    X_train_processed = preprocessor.fit_transform(X_train)
-    X_test_processed = preprocessor.transform(X_test)
+    X_test_original = X.iloc[X_test.indices] if hasattr(X_test, "indices") else X.sample(len(X_test))
 
-    # 🔥 IMPORTANT: get transformed feature names
-    feature_names = preprocessor.get_feature_names_out()
-
-    # 🔥 Clean names (remove num__ / cat__)
-    feature_names = [name.split("__")[-1] for name in feature_names]
-
-    return (
-        X_train_processed,
-        X_test_processed,
-        y_train,
-        y_test,
-        X_test,
-        preprocessor,
-        feature_names   # ✅ FIXED
-    )
+    return X_train, X_test, y_train, y_test, X_test_original, preprocessor, feature_names

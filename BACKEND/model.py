@@ -6,18 +6,17 @@ def train_model(X_train, y_train, task, model_type):
     if task == "Classification":
 
         if model_type == "Random Forest":
-            model = RandomForestClassifier(class_weight='balanced')
-
-        elif model_type == "Logistic Regression":
+            model = RandomForestClassifier()
+        else:
             model = LogisticRegression(max_iter=1000)
 
     else:
 
         if model_type == "Random Forest":
             model = RandomForestRegressor()
-
-        elif model_type == "Linear Regression":
+        else:
             model = LinearRegression()
 
     model.fit(X_train, y_train)
+
     return model

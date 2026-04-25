@@ -8,7 +8,6 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
     if not isinstance(X_sample, pd.DataFrame):
         X_sample = pd.DataFrame(X_sample, columns=feature_names)
 
-    # Choose explainer
     if hasattr(model, "estimators_"):
         explainer = shap.TreeExplainer(model)
     else:
@@ -16,15 +15,14 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
 
     shap_values = explainer(X_sample)
 
-    # 🔥 HANDLE CLASSIFICATION OUTPUT
+    # classification fix
     if isinstance(shap_values.values, np.ndarray) and len(shap_values.values.shape) == 3:
-        shap_vals = shap_values.values[:, :, 1]  # class 1
+        shap_vals = shap_values.values[:, :, 1]
     else:
         shap_vals = shap_values.values
 
     plt.close('all')
 
-    # ===== GLOBAL =====
     fig_global = plt.figure()
 
     shap.summary_plot(
@@ -34,7 +32,9 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
         show=False
     )
 
-    # ===== LOCAL =====
+    plt.xlabel("Impact on Prediction")
+    plt.ylabel("Features")
+
     fig_local = None
 
     if X_single is not None:
