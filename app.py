@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 from utils.preprocess import preprocess_data
 from BACKEND.model import train_model
@@ -115,41 +116,57 @@ else:
 
             st.pyplot(fig)
 
-            vals = np.abs(shap_vals).mean(axis=0)
-            perc = vals / vals.sum() * 100
-
-            st.markdown("### 📌 Key Feature Insights")
-
-            for i in np.argsort(vals)[::-1][:5]:
-                direction = "⬆️ increases" if np.mean(shap_vals[:, i]) > 0 else "⬇️ decreases"
-
-                st.markdown(f"""
-                <div style="padding:10px;margin-bottom:8px;background:#f8f9fa;border-radius:8px;">
-                <b>{feature_names[i]}</b><br>
-                Contribution: {perc[i]:.1f}%<br>
-                Effect: {direction}
-                </div>
-                """, unsafe_allow_html=True)
-
         # ---------- LOCAL ----------
         with tab2:
 
             option = st.radio("Choose Option", ["Select Row", "Enter New Data"])
 
-            # SELECT ROW
+            # ---------- SELECT ROW ----------
             if option == "Select Row":
 
                 row = st.number_input("Row Number", 1, len(X_test), 1)
 
                 X_single = X_test[row-1:row]
 
-                _, fig_local, _ = generate_shap_plots(
+                _, fig_local, shap_vals = generate_shap_plots(
                     model, X_test[:100], X_single, feature_names, task
                 )
 
                 st.pyplot(fig_local)
 
-            # ENTER NEW DATA
+                # 🔥 ADD CLEAR LABELS (manually shown)
+                st.markdown("**X-axis:** Impact on Prediction")
+                st.markdown("**Y-axis:** Features")
+
+                # 🔥 ENGLISH EXPLANATION
+                st.markdown("### 📌 Explanation (Top Factors)")
+
+                shap_single = shap_vals[row-1]
+
+                pairs = sorted(
+                    zip(feature_names, shap_single),
+                    key=lambda x: abs(x[1]),
+                    reverse=True
+                )
+
+                for feat, val in pairs[:5]:
+                    direction = "⬆️ increases" if val > 0 else "⬇️ decreases"
+
+                    st.markdown(f"""
+                    <div style="
+                        padding:10px;
+                        margin-bottom:8px;
+                        background:#f8f9fa;
+                        border-radius:8px;
+                        border-left:5px solid {'green' if val>0 else 'red'};
+                        font-size:15px;">
+                    <b>{feat}</b><br>
+                    Impact: {val:.2f}<br>
+                    Effect: {direction} prediction
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            # ---------- ENTER NEW DATA ----------
             else:
 
                 st.markdown("### Enter Values")
@@ -194,11 +211,14 @@ else:
 
                         st.success(f"Prediction: {pred[0]}")
 
-                        _, fig_local, _ = generate_shap_plots(
+                        _, fig_local, shap_vals = generate_shap_plots(
                             model, X_test[:100], new_processed, feature_names, task
                         )
 
                         st.pyplot(fig_local)
+
+                        st.markdown("**X-axis:** Impact on Prediction")
+                        st.markdown("**Y-axis:** Features")
 
                     except:
                         st.error("⚠️ Enter valid numeric values")
