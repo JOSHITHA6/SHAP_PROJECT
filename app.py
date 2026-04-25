@@ -92,7 +92,7 @@ elif st.session_state.page == "output":
 
     # ================= LEFT =================
     with left:
-        st.markdown("### 📄 Test Dataset (20%)")
+        st.markdown("### 📄 Test Dataset ")
         st.dataframe(test_display, height=350)
 
         st.markdown("---")
