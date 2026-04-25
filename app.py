@@ -154,6 +154,7 @@ elif st.session_state.page == "output":
 
                 row = st.number_input("Select Row", 1, len(X_test), 1)
 
+                st.markdown("### 📄 Selected Row Data")
                 st.dataframe(test_display.iloc[[row-1]])
 
                 X_single = X_test[row-1:row]
@@ -189,6 +190,10 @@ elif st.session_state.page == "output":
                 )
 
                 st.pyplot(fig_local)
+
+                # ✅ ADDED AS YOU ASKED
+                st.markdown("**X-axis = Impact on Prediction**")
+                st.markdown("**Y-axis = Features**")
 
                 st.markdown("### 📌 Why this prediction?")
 

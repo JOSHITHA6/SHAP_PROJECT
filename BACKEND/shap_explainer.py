@@ -4,15 +4,19 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-# 🔥 CRITICAL FIX (prevents $f(x)$ crash)
+# 🔥 FIX LaTeX crash
 matplotlib.rcParams['text.usetex'] = False
 
 
 def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task="Regression"):
 
+    # ✅ Convert to DataFrame → preserves feature names
+    if not isinstance(X_sample, pd.DataFrame):
+        X_sample = pd.DataFrame(X_sample, columns=feature_names)
+
     explainer = shap.Explainer(model)
 
-    # -------- GLOBAL EXPLANATION --------
+    # ---------- GLOBAL ----------
     shap_values = explainer(X_sample)
 
     plt.figure()
@@ -21,10 +25,14 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
     fig_global = plt.gcf()
     plt.close()
 
-    # -------- LOCAL EXPLANATION --------
+    # ---------- LOCAL ----------
     fig_local = None
 
     if X_single is not None:
+
+        if not isinstance(X_single, pd.DataFrame):
+            X_single = pd.DataFrame(X_single, columns=feature_names)
+
         shap_single = explainer(X_single)
 
         plt.figure()
