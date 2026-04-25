@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 from utils.preprocess import preprocess_data
 from BACKEND.model import train_model
@@ -101,7 +102,9 @@ if st.session_state.page == "input":
                 # Store in session state
                 st.session_state.update({
                     "model": model,
+                    "X_train": X_train,
                     "X_test": X_test,
+                    "y_train": y_train,
                     "y_test": y_test,
                     "test_display": test_display.reset_index(drop=True),
                     "feature_names": feature_names,
@@ -193,50 +196,89 @@ elif st.session_state.page == "output":
             
             # Generate SHAP plots
             with st.spinner("Calculating feature impacts..."):
-                fig_global, _, shap_values_array = generate_shap_plots(
+                result = generate_shap_plots(
                     model, X_test[:100], feature_names=feature_names, task=task
                 )
+                
+                # Handle different return formats
+                if len(result) == 3:
+                    fig_global, _, shap_values_array = result
+                else:
+                    st.warning("SHAP explanation could not be generated. Showing feature importance from model.")
+                    fig_global = None
+                    shap_values_array = None
             
             # Display the plot
-            st.pyplot(fig_global, use_container_width=True)
-            st.caption("📌 Each violin shows how much a feature influences predictions across all data points")
+            if fig_global:
+                st.pyplot(fig_global, use_container_width=True)
+                st.caption("📌 Each violin shows how much a feature influences predictions across all data points")
+            else:
+                # Fallback to feature importance from model
+                if hasattr(model, 'feature_importances_'):
+                    importances = model.feature_importances_
+                    indices = np.argsort(importances)[::-1][:10]
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    ax.barh(range(len(indices)), importances[indices])
+                    ax.set_yticks(range(len(indices)))
+                    ax.set_yticklabels([feature_names[i] for i in indices])
+                    ax.set_xlabel("Feature Importance")
+                    ax.set_title("Feature Importance (Model-based)")
+                    st.pyplot(fig)
+                    plt.close()
             
             st.markdown("---")
             st.markdown("### 🧠 Why This Behavior?")
             st.markdown("*Here's what the model learned from your data:*")
             
-            # Calculate feature importance from SHAP values
-            vals = np.abs(shap_values_array).mean(axis=0).flatten()
-            perc = (vals / vals.sum()) * 100
-            
-            # Get top 5 features
-            top_indices = np.argsort(vals)[::-1][:5]
-            
-            for idx in top_indices:
-                idx = int(idx)
-                mean_shap = np.mean(shap_values_array[:, idx])
-                
-                # Determine direction and color
-                if mean_shap > 0.05:
-                    direction = "pushes prediction HIGHER"
-                    color = "#28a745"
-                    icon = "📈"
-                elif mean_shap < -0.05:
-                    direction = "pushes prediction LOWER"
-                    color = "#dc3545"
-                    icon = "📉"
-                else:
-                    direction = "has mixed or minimal impact"
-                    color = "#6c757d"
-                    icon = "⚖️"
-                
-                st.markdown(f"""
-                <div class="explanation-box" style="border-left-color: {color};">
-                    <b>{icon} {feature_names[idx]}</b><br>
-                    → <b>Contribution: {perc[idx]:.1f}%</b> of total impact<br>
-                    → {direction}
-                </div>
-                """, unsafe_allow_html=True)
+            # Calculate feature importance from SHAP values if available
+            if shap_values_array is not None and len(shap_values_array) > 0:
+                try:
+                    vals = np.abs(shap_values_array).mean(axis=0).flatten()
+                    perc = (vals / vals.sum()) * 100
+                    
+                    # Get top 5 features
+                    top_indices = np.argsort(vals)[::-1][:5]
+                    
+                    for idx in top_indices:
+                        idx = int(idx)
+                        mean_shap = np.mean(shap_values_array[:, idx])
+                        
+                        # Determine direction and color
+                        if mean_shap > 0.05:
+                            direction = "pushes prediction HIGHER"
+                            color = "#28a745"
+                            icon = "📈"
+                        elif mean_shap < -0.05:
+                            direction = "pushes prediction LOWER"
+                            color = "#dc3545"
+                            icon = "📉"
+                        else:
+                            direction = "has mixed or minimal impact"
+                            color = "#6c757d"
+                            icon = "⚖️"
+                        
+                        st.markdown(f"""
+                        <div class="explanation-box" style="border-left-color: {color};">
+                            <b>{icon} {feature_names[idx]}</b><br>
+                            → <b>Contribution: {perc[idx]:.1f}%</b> of total impact<br>
+                            → {direction}
+                        </div>
+                        """, unsafe_allow_html=True)
+                except Exception as e:
+                    st.warning(f"Could not calculate SHAP feature impacts: {str(e)[:100]}")
+            else:
+                # Fallback to model feature importance
+                if hasattr(model, 'feature_importances_'):
+                    importances = model.feature_importances_
+                    indices = np.argsort(importances)[::-1][:5]
+                    for idx in indices:
+                        st.markdown(f"""
+                        <div class="explanation-box" style="border-left-color: #667eea;">
+                            <b>📊 {feature_names[idx]}</b><br>
+                            → <b>Importance: {importances[idx]*100:.1f}%</b><br>
+                            → This feature strongly influences predictions
+                        </div>
+                        """, unsafe_allow_html=True)
             
             st.info("💡 **How to read this:** Features with higher percentages have more influence on predictions. The direction tells you whether higher feature values generally increase or decrease the prediction.")
         
@@ -253,7 +295,7 @@ elif st.session_state.page == "output":
             st.dataframe(test_display.iloc[[row_num - 1]], use_container_width=True)
             
             # Get single prediction
-            X_single = X_test[row_num - 1:row_num]
+            X_single = X_test.iloc[row_num - 1:row_num]  # Fix: use iloc for DataFrame
             prediction = model.predict(X_single)[0]
             
             # Format prediction for display
@@ -280,65 +322,101 @@ elif st.session_state.page == "output":
             
             # Generate local SHAP explanation
             with st.spinner("Generating explanation..."):
-                _, fig_local, shap_values_array = generate_shap_plots(
-                    model, X_test[:100], X_single, feature_names, task
-                )
+                try:
+                    result = generate_shap_plots(
+                        model, X_test[:100], X_single, feature_names, task
+                    )
+                    
+                    if len(result) == 3:
+                        fig_global, fig_local, shap_values_array = result
+                    else:
+                        fig_global, fig_local = result
+                        shap_values_array = None
+                except Exception as e:
+                    st.error(f"Could not generate SHAP explanation: {str(e)}")
+                    fig_local = None
+                    shap_values_array = None
             
             # Display waterfall plot
             if fig_local:
                 st.markdown("### 📊 How Each Feature Contributed")
                 st.pyplot(fig_local, use_container_width=True)
                 st.caption("**X-axis = Impact on Prediction** | **Y-axis = Features**")
+            else:
+                st.warning("Local explanation plot could not be generated. Showing feature values instead.")
             
             st.markdown("---")
             st.markdown("### 🧠 Why This Prediction?")
             
-            # Get SHAP values for this specific row
-            full_shap = generate_shap_plots(model, X_test, feature_names=feature_names, task=task)[2]
-            shap_row = full_shap[row_num - 1]
-            
-            # Calculate percentages for this row
-            vals = np.abs(shap_row).flatten()
-            if vals.sum() > 0:
-                perc = (vals / vals.sum()) * 100
+            # Get SHAP values for this specific row if available
+            if shap_values_array is not None and len(shap_values_array) > row_num - 1:
+                try:
+                    shap_row = shap_values_array[row_num - 1].flatten()
+                    
+                    # Calculate percentages for this row
+                    vals = np.abs(shap_row)
+                    if vals.sum() > 0:
+                        perc = (vals / vals.sum()) * 100
+                    else:
+                        perc = np.zeros_like(vals)
+                    
+                    # Sort by absolute impact
+                    sorted_indices = np.argsort(np.abs(shap_row))[::-1][:5]
+                    
+                    for idx in sorted_indices:
+                        idx = int(idx)
+                        shap_val = shap_row[idx]
+                        
+                        # Determine direction and color
+                        if shap_val > 0.05:
+                            direction = "pushes prediction HIGHER"
+                            color = "#28a745"
+                            icon = "📈"
+                        elif shap_val < -0.05:
+                            direction = "pushes prediction LOWER"
+                            color = "#dc3545"
+                            icon = "📉"
+                        else:
+                            direction = "has minimal impact on this prediction"
+                            color = "#6c757d"
+                            icon = "⚖️"
+                        
+                        # Get the actual value of this feature for the selected row
+                        try:
+                            # Fix: Use iloc and column name
+                            feature_value = X_single.iloc[0, idx] if idx < len(X_single.columns) else "N/A"
+                            if isinstance(feature_value, (int, float)):
+                                if isinstance(feature_value, float):
+                                    value_display = f"{feature_value:.2f}"
+                                else:
+                                    value_display = str(feature_value)
+                            else:
+                                value_display = str(feature_value)
+                        except:
+                            value_display = "N/A"
+                        
+                        st.markdown(f"""
+                        <div class="explanation-box" style="border-left-color: {color};">
+                            <b>{icon} {feature_names[idx]}</b><br>
+                            → <b>Value:</b> {value_display}<br>
+                            → <b>Contribution:</b> {perc[idx]:.1f}% of the explanation<br>
+                            → {direction}
+                        </div>
+                        """, unsafe_allow_html=True)
+                except Exception as e:
+                    st.warning(f"Could not calculate SHAP values for this row: {str(e)[:100]}")
+                    # Fallback to showing actual feature values
+                    st.markdown("**Feature values for this prediction:**")
+                    for i, feat in enumerate(feature_names[:10]):  # Show top 10 features
+                        if i < len(X_single.columns):
+                            value = X_single.iloc[0, i]
+                            st.text(f"{feat}: {value}")
             else:
-                perc = np.zeros_like(vals)
-            
-            # Sort by absolute impact
-            sorted_indices = np.argsort(np.abs(shap_row))[::-1][:5]
-            
-            for idx in sorted_indices:
-                idx = int(idx)
-                shap_val = shap_row[idx]
-                
-                # Determine direction and color
-                if shap_val > 0.05:
-                    direction = "pushes prediction HIGHER"
-                    color = "#28a745"
-                    icon = "📈"
-                elif shap_val < -0.05:
-                    direction = "pushes prediction LOWER"
-                    color = "#dc3545"
-                    icon = "📉"
-                else:
-                    direction = "has minimal impact on this prediction"
-                    color = "#6c757d"
-                    icon = "⚖️"
-                
-                # Get the actual value of this feature for the selected row
-                actual_value = X_test[row_num - 1, idx]
-                if isinstance(actual_value, (int, float)):
-                    value_display = f"{actual_value:.2f}" if isinstance(actual_value, float) else str(actual_value)
-                else:
-                    value_display = str(actual_value)
-                
-                st.markdown(f"""
-                <div class="explanation-box" style="border-left-color: {color};">
-                    <b>{icon} {feature_names[idx]}</b><br>
-                    → <b>Value:</b> {value_display}<br>
-                    → <b>Contribution:</b> {perc[idx]:.1f}% of the explanation<br>
-                    → {direction}
-                </div>
-                """, unsafe_allow_html=True)
+                # Fallback to showing feature values
+                st.markdown("**Feature values for this prediction:**")
+                for i, feat in enumerate(feature_names[:10]):  # Show top 10 features
+                    if i < len(X_single.columns):
+                        value = X_single.iloc[0, i]
+                        st.text(f"{feat}: {value}")
             
             st.info("💡 **What this means:** The features listed above are why the model made THIS specific prediction. Green features pushed the prediction higher, red features pushed it lower.")
