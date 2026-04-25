@@ -65,9 +65,6 @@ if st.session_state.page == "input":
                     "test_display": test_display.reset_index(drop=True),
                     "feature_names": feature_names,
                     "task": task,
-                    "preprocessor": preprocessor,
-                    "original_columns": original_columns,
-                    "df_full": df_full,
                     "target": target
                 })
 
@@ -91,6 +88,7 @@ elif st.session_state.page == "output":
         test_display = st.session_state.test_display
         feature_names = st.session_state.feature_names
         task = st.session_state.task
+        target = st.session_state.target
 
         left, _, right = st.columns([1.1, 0.1, 1.4])
 
@@ -105,9 +103,11 @@ elif st.session_state.page == "output":
             y_pred = model.predict(X_test)
 
             if task == "Classification":
-                st.success(f"Accuracy: {accuracy_score(y_test, y_pred):.2f}")
+                acc = accuracy_score(y_test, y_pred)
+                st.success(f"Accuracy: {acc:.2f}")
             else:
-                st.success(f"R² Score: {r2_score(y_test, y_pred):.2f}")
+                r2 = r2_score(y_test, y_pred)
+                st.success(f"R² Score: {r2:.2f}")
 
         # -------- RIGHT --------
         with right:
@@ -123,7 +123,7 @@ elif st.session_state.page == "output":
 
                 st.pyplot(fig)
 
-                st.markdown("### 📌 Global Insights (Simple Explanation)")
+                st.markdown("### 📌 Global Insights")
 
                 vals = np.abs(shap_vals).mean(axis=0)
                 perc = (vals / vals.sum()) * 100
@@ -160,13 +160,32 @@ elif st.session_state.page == "output":
 
                 X_single = X_test[row-1:row]
 
+                # 🔥 1. PREDICTION FIRST
+                pred = model.predict(X_single)[0]
+
+                st.markdown("### 🎯 Prediction")
+
+                if task == "Classification":
+                    st.success(f"{target}: {'YES' if pred == 1 else 'NO'}")
+                else:
+                    st.success(f"{target}: {round(pred, 3)}")
+
+                # 🔥 2. METRIC (REFERENCE)
+                st.markdown("### 📈 Model Reliability")
+
+                if task == "Classification":
+                    st.info(f"Accuracy: {accuracy_score(y_test, model.predict(X_test)):.2f}")
+                else:
+                    st.info(f"R² Score: {r2_score(y_test, model.predict(X_test)):.2f}")
+
+                # 🔥 3. EXPLAINABILITY
                 _, fig_local, shap_vals = generate_shap_plots(
                     model, X_test[:100], X_single, feature_names, task
                 )
 
                 st.pyplot(fig_local)
 
-                # ✅ NEW ADDITION (AS YOU ASKED)
+                # axis labels (below graph)
                 st.markdown("**X-axis:** Impact on Prediction")
                 st.markdown("**Y-axis:** Features")
 
