@@ -22,8 +22,16 @@ def preprocess_data(df, target):
         X_processed, y, test_size=0.2, random_state=42
     )
 
-    feature_names = list(preprocessor.get_feature_names_out())
+    feature_names = preprocessor.get_feature_names_out()
 
-    X_test_original = X.iloc[X_test.indices] if hasattr(X_test, "indices") else X.sample(len(X_test))
+    X_test_original = X.iloc[:len(X_test)]
 
-    return X_train, X_test, y_train, y_test, X_test_original, preprocessor, feature_names
+    return (
+        X_train, X_test,
+        y_train, y_test,
+        X_test_original,
+        preprocessor,
+        feature_names,
+        X.columns,
+        df
+    )
