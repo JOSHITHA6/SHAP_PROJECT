@@ -52,7 +52,7 @@ if st.session_state.page == "input":
                     df_full
                 ) = preprocess_data(df, target)
 
-                # ✅ INCLUDE TARGET COLUMN IN TEST DISPLAY
+                # include target column
                 test_display = X_test_original.copy()
                 test_display[target] = y_test.values
 
@@ -123,6 +123,30 @@ elif st.session_state.page == "output":
 
                 st.pyplot(fig)
 
+                st.markdown("### 📌 Global Insights (Simple Explanation)")
+
+                vals = np.abs(shap_vals).mean(axis=0)
+                perc = (vals / vals.sum()) * 100
+
+                top_idx = np.argsort(vals)[::-1][:5]
+
+                for i in top_idx:
+                    direction = "increases" if np.mean(shap_vals[:, i]) > 0 else "decreases"
+
+                    st.markdown(f"""
+                    <div style="
+                        padding:12px;
+                        margin-bottom:10px;
+                        background:#f8f9fa;
+                        border-radius:10px;
+                        border-left:6px solid {'green' if direction=='increases' else 'red'};
+                        font-size:15px;">
+                    <b>{feature_names[i]}</b><br>
+                    👉 Contributes <b>{perc[i]:.1f}%</b><br>
+                    👉 Usually <b>{direction}</b> the prediction
+                    </div>
+                    """, unsafe_allow_html=True)
+
             # ---------- LOCAL ----------
             with tab2:
 
@@ -130,7 +154,7 @@ elif st.session_state.page == "output":
 
                 row = st.number_input("Row Number", 1, len(X_test), 1)
 
-                # ✅ SHOW SELECTED ROW CLEARLY
+                # show selected row
                 st.markdown("### 📄 Selected Row Data")
                 st.dataframe(test_display.iloc[[row-1]])
 
@@ -142,7 +166,10 @@ elif st.session_state.page == "output":
 
                 st.pyplot(fig_local)
 
-                # ✅ FIXED EXPLANATION (NO MISMATCH)
+                # ✅ NEW ADDITION (AS YOU ASKED)
+                st.markdown("**X-axis:** Impact on Prediction")
+                st.markdown("**Y-axis:** Features")
+
                 st.markdown("### 📌 Why this prediction?")
 
                 shap_row = shap_vals[row-1]
