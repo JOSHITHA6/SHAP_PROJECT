@@ -42,9 +42,12 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
             shap_values = explainer.shap_values(X_sample)
             
             # Handle classification with multiple classes
-            if len(shap_values.shape) == 3:
+            if isinstance(shap_values, list):
                 # For multi-class, take the class with highest predicted probability
-                shap_values = shap_values[:, :, 1] if shap_values.shape[2] > 1 else shap_values[:, :, 0]
+                if len(shap_values) > 1:
+                    shap_values = shap_values[1]
+                else:
+                    shap_values = shap_values[0]
         
         # For linear models
         elif 'Linear' in str(type(model)) or 'Logistic' in str(type(model)):
@@ -77,9 +80,15 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
     plt.figure(figsize=(10, 6), facecolor='white')
     
     try:
+        # Ensure X_sample has correct length
+        if len(shap_values) != len(X_sample):
+            X_sample_for_plot = X_sample.iloc[:len(shap_values)]
+        else:
+            X_sample_for_plot = X_sample
+            
         shap.summary_plot(
             shap_values, 
-            X_sample, 
+            X_sample_for_plot, 
             plot_type="violin",
             show=False,
             max_display=10,
@@ -93,7 +102,7 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
         plt.clf()
         shap.summary_plot(
             shap_values, 
-            X_sample, 
+            X_sample_for_plot, 
             plot_type="bar",
             show=False,
             max_display=10
@@ -117,12 +126,16 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
             # Get SHAP values for single instance
             if 'TreeExplainer' in str(explainer):
                 shap_single = explainer.shap_values(X_single)
-                if len(shap_single.shape) == 3:
-                    shap_single = shap_single[:, :, 1] if shap_single.shape[2] > 1 else shap_single[:, :, 0]
+                if isinstance(shap_single, list):
+                    shap_single = shap_single[1] if len(shap_single) > 1 else shap_single[0]
             else:
                 shap_single = explainer.shap_values(X_single)
                 if isinstance(shap_single, list):
                     shap_single = shap_single[1] if len(shap_single) > 1 else shap_single[0]
+            
+            # Ensure we have 2D array
+            if len(shap_single.shape) == 3:
+                shap_single = shap_single[:, :, 0]
             
             # Create waterfall plot
             plt.figure(figsize=(10, 6), facecolor='white')
@@ -138,7 +151,7 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
             # Create waterfall
             shap.plots.waterfall(
                 shap.Explanation(
-                    values=shap_single[0],
+                    values=shap_single[0] if len(shap_single.shape) > 1 else shap_single,
                     base_values=expected_value,
                     data=X_single.iloc[0].values,
                     feature_names=X_single.columns.tolist()
@@ -158,28 +171,31 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
             plt.figure(figsize=(10, 6), facecolor='white')
             
             # Get SHAP values for single instance
-            if 'TreeExplainer' in str(explainer):
-                shap_single = explainer.shap_values(X_single)
-                if len(shap_single.shape) == 3:
-                    shap_single = shap_single[:, :, 1] if shap_single.shape[2] > 1 else shap_single[:, :, 0]
-            else:
-                shap_single = explainer.shap_values(X_single)
-                if isinstance(shap_single, list):
-                    shap_single = shap_single[1] if len(shap_single) > 1 else shap_single[0]
-            
-            # Create horizontal bar chart
-            feature_impacts = shap_single[0]
-            sorted_idx = np.argsort(np.abs(feature_impacts))[-10:]
-            
-            y_pos = np.arange(len(sorted_idx))
-            plt.barh(y_pos, feature_impacts[sorted_idx])
-            plt.yticks(y_pos, X_sample.columns[sorted_idx])
-            plt.xlabel("SHAP Value (Impact on Prediction)")
-            plt.title("Feature Contributions to This Prediction")
-            plt.axvline(x=0, color='black', linestyle='-', linewidth=0.5)
-            plt.tight_layout()
-            
-            fig_local = plt.gcf()
-            plt.close()
+            try:
+                if 'TreeExplainer' in str(explainer):
+                    shap_single = explainer.shap_values(X_single)
+                    if isinstance(shap_single, list):
+                        shap_single = shap_single[1] if len(shap_single) > 1 else shap_single[0]
+                else:
+                    shap_single = explainer.shap_values(X_single)
+                    if isinstance(shap_single, list):
+                        shap_single = shap_single[1] if len(shap_single) > 1 else shap_single[0]
+                
+                # Create horizontal bar chart
+                feature_impacts = shap_single[0] if len(shap_single.shape) > 1 else shap_single
+                sorted_idx = np.argsort(np.abs(feature_impacts))[-10:]
+                
+                y_pos = np.arange(len(sorted_idx))
+                plt.barh(y_pos, feature_impacts[sorted_idx])
+                plt.yticks(y_pos, [X_sample.columns[i] for i in sorted_idx])
+                plt.xlabel("SHAP Value (Impact on Prediction)")
+                plt.title("Feature Contributions to This Prediction")
+                plt.axvline(x=0, color='black', linestyle='-', linewidth=0.5)
+                plt.tight_layout()
+                
+                fig_local = plt.gcf()
+                plt.close()
+            except:
+                pass
     
     return fig_global, fig_local, shap_values
