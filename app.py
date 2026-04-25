@@ -61,6 +61,15 @@ st.markdown("""
         margin-bottom: 20px;
         text-align: center;
     }
+    .contribution-badge {
+        background: #667eea;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: bold;
+        display: inline-block;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -342,7 +351,7 @@ elif st.session_state.page == "output":
             
             st.info("💡 **How to read this:** Features with higher percentages have more influence on predictions. The direction tells you whether higher feature values generally increase or decrease the prediction.")
         
-        # ---------- LOCAL EXPLAINABILITY TAB (ENHANCED) ----------
+        # ---------- LOCAL EXPLAINABILITY TAB (ENHANCED WITH PERCENTAGES) ----------
         with tab2:
             st.subheader("🔍 Explain a Single Prediction")
             
@@ -481,7 +490,6 @@ elif st.session_state.page == "output":
                 if task == "Classification":
                     if explanation_source == "📊 Select Row from Test Data":
                         is_correct = current_prediction == current_actual
-                        prediction_display = "✅ " + str(current_prediction) if is_correct else "❌ " + str(current_prediction)
                         st.markdown(f"""
                         <div class="metric-card" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
                             <h3>🎯 Model Prediction</h3>
@@ -548,7 +556,7 @@ elif st.session_state.page == "output":
                 
                 st.markdown("---")
                 
-                # ========== LOCAL: WHY THIS BEHAVIOR? SECTION ==========
+                # ========== LOCAL: WHY THIS BEHAVIOR? SECTION WITH PERCENTAGES ==========
                 st.markdown("### 🧠 Why This Behavior?")
                 st.markdown("*Here's why the model made this specific prediction:*")
                 
@@ -576,6 +584,9 @@ elif st.session_state.page == "output":
                         
                         # Store explanations for summary
                         explanations = []
+                        
+                        # Display header for percentage contributions
+                        st.markdown("#### 📊 Feature Contributions (by percentage)")
                         
                         for idx in sorted_indices:
                             idx = int(idx)
@@ -627,45 +638,91 @@ elif st.session_state.page == "output":
                                     'effect': effect
                                 })
                                 
+                                # Display each feature with clear percentage
                                 st.markdown(f"""
                                 <div class="explanation-box" style="border-left-color: {color};">
                                     <b>{icon} {feature_names[idx]}</b><br>
                                     → <b>Value:</b> {value_display}<br>
-                                    → <b>Contribution:</b> {perc[idx]:.1f}% of the explanation<br>
+                                    → <b>Contribution:</b> <span style="font-size: 16px; font-weight: bold; color: {color};">{perc[idx]:.1f}%</span> of the explanation<br>
                                     → {direction}
                                 </div>
                                 """, unsafe_allow_html=True)
                         
-                        # Add a summary insight
+                        # Add a summary section with percentages
                         st.markdown("---")
+                        st.markdown("#### 📈 Contribution Summary")
+                        
+                        # Create a visual summary of contributions
+                        col1, col2, col3 = st.columns(3)
+                        
+                        total_positive = sum(e['contribution'] for e in explanations if e['effect'] == 'positive')
+                        total_negative = sum(e['contribution'] for e in explanations if e['effect'] == 'negative')
+                        total_neutral = sum(e['contribution'] for e in explanations if e['effect'] == 'neutral')
+                        
+                        with col1:
+                            st.metric("📈 Pushing HIGHER", f"{total_positive:.1f}%")
+                        with col2:
+                            st.metric("📉 Pushing LOWER", f"{total_negative:.1f}%")
+                        with col3:
+                            st.metric("⚖️ Minimal Impact", f"{total_neutral:.1f}%")
+                        
+                        # Add a detailed breakdown
+                        st.markdown("#### 🔍 Detailed Breakdown")
+                        
+                        # Create a dataframe for better visualization
+                        breakdown_data = []
+                        for exp in explanations[:5]:
+                            breakdown_data.append({
+                                "Feature": exp['feature'],
+                                "Value": exp['value'],
+                                "Contribution %": f"{exp['contribution']:.1f}%",
+                                "Direction": exp['direction']
+                            })
+                        
+                        if breakdown_data:
+                            breakdown_df = pd.DataFrame(breakdown_data)
+                            st.dataframe(breakdown_df, use_container_width=True, hide_index=True)
+                        
+                        # Add insight based on contributions
                         st.markdown("#### 💡 Key Insight")
                         
                         # Find the most influential feature
                         if explanations:
                             top_feature = max(explanations, key=lambda x: x['contribution'])
-                            positive_features = [e for e in explanations if e['effect'] == 'positive']
-                            negative_features = [e for e in explanations if e['effect'] == 'negative']
+                            second_feature = sorted(explanations, key=lambda x: x['contribution'], reverse=True)[1] if len(explanations) > 1 else None
                             
                             if task == "Classification":
-                                if positive_features and not negative_features:
-                                    st.info(f"✨ The prediction of **{current_prediction}** is primarily driven by {len(positive_features)} feature(s) pushing the prediction higher.")
-                                elif negative_features and not positive_features:
-                                    st.info(f"📉 The prediction of **{current_prediction}** is primarily driven by {len(negative_features)} feature(s) pushing the prediction lower.")
-                                elif positive_features and negative_features:
-                                    st.info(f"⚖️ The prediction of **{current_prediction}** is balanced between {len(positive_features)} feature(s) pushing higher and {len(negative_features)} feature(s) pushing lower.")
+                                insight_text = f"""
+                                The prediction of **{current_prediction}** is primarily influenced by:
+                                
+                                - **{top_feature['feature']}** contributed **{top_feature['contribution']:.1f}%** 
+                                """
+                                if second_feature:
+                                    insight_text += f"\n- **{second_feature['feature']}** contributed **{second_feature['contribution']:.1f}%**"
+                                
+                                if total_positive > total_negative + 20:
+                                    insight_text += f"\n\n✨ The prediction is strongly pushed HIGHER by {len([e for e in explanations if e['effect'] == 'positive'])} feature(s) accounting for {total_positive:.1f}% of the explanation."
+                                elif total_negative > total_positive + 20:
+                                    insight_text += f"\n\n📉 The prediction is strongly pushed LOWER by {len([e for e in explanations if e['effect'] == 'negative'])} feature(s) accounting for {total_negative:.1f}% of the explanation."
                                 else:
-                                    st.info(f"🔍 The prediction of **{current_prediction}** has mixed influences from the features above.")
+                                    insight_text += f"\n\n⚖️ The prediction is balanced between {len([e for e in explanations if e['effect'] == 'positive'])} feature(s) pushing higher ({total_positive:.1f}%) and {len([e for e in explanations if e['effect'] == 'negative'])} feature(s) pushing lower ({total_negative:.1f}%)."
                             else:
-                                if positive_features and not negative_features:
-                                    st.info(f"✨ The prediction of **{current_prediction:.2f}** is primarily driven by {len(positive_features)} feature(s) pushing the prediction higher.")
-                                elif negative_features and not positive_features:
-                                    st.info(f"📉 The prediction of **{current_prediction:.2f}** is primarily driven by {len(negative_features)} feature(s) pushing the prediction lower.")
-                                elif positive_features and negative_features:
-                                    st.info(f"⚖️ The prediction of **{current_prediction:.2f}** is balanced between {len(positive_features)} feature(s) pushing higher and {len(negative_features)} feature(s) pushing lower.")
+                                insight_text = f"""
+                                The prediction of **{current_prediction:.2f}** is primarily influenced by:
+                                
+                                - **{top_feature['feature']}** contributed **{top_feature['contribution']:.1f}%** 
+                                """
+                                if second_feature:
+                                    insight_text += f"\n- **{second_feature['feature']}** contributed **{second_feature['contribution']:.1f}%**"
+                                
+                                if total_positive > total_negative + 20:
+                                    insight_text += f"\n\n✨ The prediction is strongly pushed HIGHER by {len([e for e in explanations if e['effect'] == 'positive'])} feature(s) accounting for {total_positive:.1f}% of the explanation."
+                                elif total_negative > total_positive + 20:
+                                    insight_text += f"\n\n📉 The prediction is strongly pushed LOWER by {len([e for e in explanations if e['effect'] == 'negative'])} feature(s) accounting for {total_negative:.1f}% of the explanation."
                                 else:
-                                    st.info(f"🔍 The prediction of **{current_prediction:.2f}** has mixed influences from the features above.")
+                                    insight_text += f"\n\n⚖️ The prediction is balanced between {len([e for e in explanations if e['effect'] == 'positive'])} feature(s) pushing higher ({total_positive:.1f}%) and {len([e for e in explanations if e['effect'] == 'negative'])} feature(s) pushing lower ({total_negative:.1f}%)."
                             
-                            st.markdown(f"🎯 **Most influential feature:** *{top_feature['feature']}* contributed **{top_feature['contribution']:.1f}%** to this prediction.")
+                            st.info(insight_text)
                         
                     except Exception as e:
                         st.warning(f"Could not calculate SHAP values for this prediction: {str(e)[:100]}")
@@ -683,4 +740,4 @@ elif st.session_state.page == "output":
                             value = X_single.iloc[0, i]
                             st.text(f"{feat}: {value}")
                 
-                st.info("💡 **What this means:** The features listed above explain why the model made THIS specific prediction. Green features pushed the prediction higher, red features pushed it lower. The percentage shows how much each feature contributed to the final prediction.")
+                st.info("💡 **What this means:** The percentages show how much each feature contributed to the final prediction. Green features pushed the prediction higher, red features pushed it lower. The sum of all contributions equals 100%.")
