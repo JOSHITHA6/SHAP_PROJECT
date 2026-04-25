@@ -10,7 +10,6 @@ from sklearn.metrics import accuracy_score, r2_score
 
 st.set_page_config(layout="wide")
 
-# 🔥 ROOT CONTAINER (IMPORTANT FIX)
 root = st.container()
 
 # ---------------- STATE ----------------
@@ -151,6 +150,7 @@ elif st.session_state.page == "output":
 
                 option = st.radio("Choose Option", ["Select Row", "Enter New Data"])
 
+                # -------- SELECT ROW --------
                 if option == "Select Row":
 
                     row = st.number_input("Row Number", 1, len(X_test), 1)
@@ -192,6 +192,7 @@ elif st.session_state.page == "output":
                         </div>
                         """, unsafe_allow_html=True)
 
+                # -------- ENTER NEW DATA --------
                 else:
 
                     st.markdown("### Enter Values")
