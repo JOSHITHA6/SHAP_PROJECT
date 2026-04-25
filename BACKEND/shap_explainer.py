@@ -4,7 +4,7 @@ import numpy as np
 
 from utils.preprocess import preprocess_data
 from BACKEND.model import train_model
-from BACKEND.shap_explainer import generate_shap_plots
+
 
 from sklearn.metrics import accuracy_score, r2_score
 
