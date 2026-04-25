@@ -21,10 +21,11 @@ st.markdown("""
         border-radius: 10px;
         border-left: 6px solid;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        transition: all 0.2s ease;
     }
     .explanation-box:hover {
         background: #f0f2f6;
-        transition: 0.2s;
+        transform: translateX(5px);
     }
     .metric-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -51,6 +52,14 @@ st.markdown("""
         margin: 5px 0;
         font-family: monospace;
         font-size: 14px;
+    }
+    .behavior-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 15px;
+        border-radius: 10px;
+        color: white;
+        margin-bottom: 20px;
+        text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -251,7 +260,7 @@ elif st.session_state.page == "output":
             
             st.markdown("---")
             
-            # ========== NEW: OVERALL MODEL PREDICTION SECTION ==========
+            # ========== GLOBAL: OVERALL MODEL PREDICTION SECTION ==========
             st.markdown("### 🎯 Overall Model Prediction")
             
             if task == "Classification":
@@ -337,7 +346,7 @@ elif st.session_state.page == "output":
         with tab2:
             st.subheader("🔍 Explain a Single Prediction")
             
-            # ========== NEW: Two options for local explanation ==========
+            # ========== Two options for local explanation ==========
             explanation_source = st.radio(
                 "Choose input method:",
                 ["📊 Select Row from Test Data", "✏️ Enter New Data"],
@@ -529,7 +538,7 @@ elif st.session_state.page == "output":
                     st.markdown("### 📊 How Each Feature Contributed")
                     st.pyplot(fig_local, use_container_width=True)
                     
-                    # ========== FIXED: Axis labels (one below the other) ==========
+                    # Axis labels (one below the other)
                     st.markdown("---")
                     st.markdown("### 📐 Chart Explanation")
                     st.markdown('<div class="axis-label">📊 X-axis = Impact on Prediction</div>', unsafe_allow_html=True)
@@ -538,14 +547,20 @@ elif st.session_state.page == "output":
                     st.warning("Local explanation plot could not be generated.")
                 
                 st.markdown("---")
-                st.markdown("### 🧠 Why This Prediction?")
+                
+                # ========== LOCAL: WHY THIS BEHAVIOR? SECTION ==========
+                st.markdown("### 🧠 Why This Behavior?")
+                st.markdown("*Here's why the model made this specific prediction:*")
                 
                 # Get SHAP values for this specific row if available
                 if shap_values_array is not None and len(shap_values_array) > 0:
                     try:
                         # Get the correct index
                         if len(shap_values_array.shape) == 2:
-                            shap_row = shap_values_array[0].flatten() if len(shap_values_array) == 1 else shap_values_array.flatten()
+                            if len(shap_values_array) == 1:
+                                shap_row = shap_values_array[0].flatten()
+                            else:
+                                shap_row = shap_values_array.flatten()
                         else:
                             shap_row = shap_values_array.flatten()
                         
@@ -559,6 +574,9 @@ elif st.session_state.page == "output":
                         # Sort by absolute impact
                         sorted_indices = np.argsort(np.abs(shap_row))[::-1][:5]
                         
+                        # Store explanations for summary
+                        explanations = []
+                        
                         for idx in sorted_indices:
                             idx = int(idx)
                             if idx < len(feature_names):
@@ -569,14 +587,17 @@ elif st.session_state.page == "output":
                                     direction = "pushes prediction HIGHER"
                                     color = "#28a745"
                                     icon = "📈"
+                                    effect = "positive"
                                 elif shap_val < -0.05:
                                     direction = "pushes prediction LOWER"
                                     color = "#dc3545"
                                     icon = "📉"
+                                    effect = "negative"
                                 else:
                                     direction = "has minimal impact on this prediction"
                                     color = "#6c757d"
                                     icon = "⚖️"
+                                    effect = "neutral"
                                 
                                 # Get the actual value of this feature
                                 try:
@@ -596,6 +617,16 @@ elif st.session_state.page == "output":
                                 except:
                                     value_display = "N/A"
                                 
+                                explanations.append({
+                                    'feature': feature_names[idx],
+                                    'value': value_display,
+                                    'contribution': perc[idx],
+                                    'direction': direction,
+                                    'color': color,
+                                    'icon': icon,
+                                    'effect': effect
+                                })
+                                
                                 st.markdown(f"""
                                 <div class="explanation-box" style="border-left-color: {color};">
                                     <b>{icon} {feature_names[idx]}</b><br>
@@ -604,6 +635,38 @@ elif st.session_state.page == "output":
                                     → {direction}
                                 </div>
                                 """, unsafe_allow_html=True)
+                        
+                        # Add a summary insight
+                        st.markdown("---")
+                        st.markdown("#### 💡 Key Insight")
+                        
+                        # Find the most influential feature
+                        if explanations:
+                            top_feature = max(explanations, key=lambda x: x['contribution'])
+                            positive_features = [e for e in explanations if e['effect'] == 'positive']
+                            negative_features = [e for e in explanations if e['effect'] == 'negative']
+                            
+                            if task == "Classification":
+                                if positive_features and not negative_features:
+                                    st.info(f"✨ The prediction of **{current_prediction}** is primarily driven by {len(positive_features)} feature(s) pushing the prediction higher.")
+                                elif negative_features and not positive_features:
+                                    st.info(f"📉 The prediction of **{current_prediction}** is primarily driven by {len(negative_features)} feature(s) pushing the prediction lower.")
+                                elif positive_features and negative_features:
+                                    st.info(f"⚖️ The prediction of **{current_prediction}** is balanced between {len(positive_features)} feature(s) pushing higher and {len(negative_features)} feature(s) pushing lower.")
+                                else:
+                                    st.info(f"🔍 The prediction of **{current_prediction}** has mixed influences from the features above.")
+                            else:
+                                if positive_features and not negative_features:
+                                    st.info(f"✨ The prediction of **{current_prediction:.2f}** is primarily driven by {len(positive_features)} feature(s) pushing the prediction higher.")
+                                elif negative_features and not positive_features:
+                                    st.info(f"📉 The prediction of **{current_prediction:.2f}** is primarily driven by {len(negative_features)} feature(s) pushing the prediction lower.")
+                                elif positive_features and negative_features:
+                                    st.info(f"⚖️ The prediction of **{current_prediction:.2f}** is balanced between {len(positive_features)} feature(s) pushing higher and {len(negative_features)} feature(s) pushing lower.")
+                                else:
+                                    st.info(f"🔍 The prediction of **{current_prediction:.2f}** has mixed influences from the features above.")
+                            
+                            st.markdown(f"🎯 **Most influential feature:** *{top_feature['feature']}* contributed **{top_feature['contribution']:.1f}%** to this prediction.")
+                        
                     except Exception as e:
                         st.warning(f"Could not calculate SHAP values for this prediction: {str(e)[:100]}")
                         # Fallback to showing feature values
@@ -620,4 +683,4 @@ elif st.session_state.page == "output":
                             value = X_single.iloc[0, i]
                             st.text(f"{feat}: {value}")
                 
-                st.info("💡 **What this means:** The features listed above explain why the model made THIS specific prediction. Green features pushed the prediction higher, red features pushed it lower.")
+                st.info("💡 **What this means:** The features listed above explain why the model made THIS specific prediction. Green features pushed the prediction higher, red features pushed it lower. The percentage shows how much each feature contributed to the final prediction.")
