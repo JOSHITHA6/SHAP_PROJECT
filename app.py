@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 
 from utils.preprocess import preprocess_data
 from BACKEND.model import train_model
@@ -116,6 +115,30 @@ else:
 
             st.pyplot(fig)
 
+            st.markdown("### 📌 Global Insights (in % contribution)")
+
+            vals = np.abs(shap_vals).mean(axis=0)
+            perc = (vals / vals.sum()) * 100
+
+            top_idx = np.argsort(vals)[::-1][:5]
+
+            for i in top_idx:
+                direction = "increases" if np.mean(shap_vals[:, i]) > 0 else "decreases"
+
+                st.markdown(f"""
+                <div style="
+                    padding:12px;
+                    margin-bottom:10px;
+                    background:#f8f9fa;
+                    border-radius:10px;
+                    border-left:6px solid {'green' if direction=='increases' else 'red'};
+                    font-size:15px;">
+                <b>{feature_names[i]}</b><br>
+                👉 Contributes <b>{perc[i]:.1f}%</b><br>
+                👉 Usually <b>{direction}</b> the prediction
+                </div>
+                """, unsafe_allow_html=True)
+
         # ---------- LOCAL ----------
         with tab2:
 
@@ -134,35 +157,37 @@ else:
 
                 st.pyplot(fig_local)
 
-                # 🔥 ADD CLEAR LABELS (manually shown)
                 st.markdown("**X-axis:** Impact on Prediction")
                 st.markdown("**Y-axis:** Features")
 
-                # 🔥 ENGLISH EXPLANATION
-                st.markdown("### 📌 Explanation (Top Factors)")
+                st.markdown("### 📌 Why this prediction? (in %)")
 
-                shap_single = shap_vals[row-1]
+                shap_row = shap_vals[row-1]
+
+                vals = np.abs(shap_row)
+                perc = (vals / vals.sum()) * 100
 
                 pairs = sorted(
-                    zip(feature_names, shap_single),
+                    zip(feature_names, shap_row, perc),
                     key=lambda x: abs(x[1]),
                     reverse=True
                 )
 
-                for feat, val in pairs[:5]:
-                    direction = "⬆️ increases" if val > 0 else "⬇️ decreases"
+                for feat, val, p in pairs[:5]:
+
+                    direction = "increases" if val > 0 else "decreases"
 
                     st.markdown(f"""
                     <div style="
-                        padding:10px;
-                        margin-bottom:8px;
+                        padding:12px;
+                        margin-bottom:10px;
                         background:#f8f9fa;
-                        border-radius:8px;
-                        border-left:5px solid {'green' if val>0 else 'red'};
+                        border-radius:10px;
+                        border-left:6px solid {'green' if val>0 else 'red'};
                         font-size:15px;">
                     <b>{feat}</b><br>
-                    Impact: {val:.2f}<br>
-                    Effect: {direction} prediction
+                    👉 Contribution: <b>{p:.1f}%</b><br>
+                    👉 This feature <b>{direction}</b> the prediction
                     </div>
                     """, unsafe_allow_html=True)
 
