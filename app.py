@@ -10,11 +10,11 @@ from sklearn.metrics import accuracy_score, r2_score
 
 st.set_page_config(layout="wide")
 
-# ================= STATE =================
+# ---------------- STATE ----------------
 if "page" not in st.session_state:
     st.session_state.page = "input"
 
-# ================= INPUT PAGE =================
+# ---------------- INPUT PAGE ----------------
 if st.session_state.page == "input":
 
     st.title("SHAP - AI Model Explainability Tool")
@@ -65,7 +65,7 @@ if st.session_state.page == "input":
             st.session_state.page = "output"
             st.rerun()
 
-# ================= OUTPUT PAGE =================
+# ---------------- OUTPUT PAGE ----------------
 else:
 
     st.title("📊 Model Output Dashboard")
@@ -86,7 +86,7 @@ else:
 
     left, _, right = st.columns([1.1, 0.1, 1.4])
 
-    # ================= LEFT =================
+    # -------- LEFT --------
     with left:
         st.subheader("📄 Test Dataset (20%)")
         st.dataframe(test_display, height=350)
@@ -101,7 +101,7 @@ else:
         else:
             st.success(f"R² Score: {r2_score(y_test, y_pred):.2f}")
 
-    # ================= RIGHT =================
+    # -------- RIGHT --------
     with right:
 
         tab1, tab2 = st.tabs(["🌍 Global Explainability", "🔍 Local Explainability"])
@@ -115,7 +115,6 @@ else:
 
             st.pyplot(fig)
 
-            # % contribution
             vals = np.abs(shap_vals).mean(axis=0)
             perc = vals / vals.sum() * 100
 
@@ -137,20 +136,20 @@ else:
 
             option = st.radio("Choose Option", ["Select Row", "Enter New Data"])
 
-            # -------- SELECT ROW --------
+            # SELECT ROW
             if option == "Select Row":
 
                 row = st.number_input("Row Number", 1, len(X_test), 1)
 
                 X_single = X_test[row-1:row]
 
-                _, fig_local, shap_vals = generate_shap_plots(
+                _, fig_local, _ = generate_shap_plots(
                     model, X_test[:100], X_single, feature_names, task
                 )
 
                 st.pyplot(fig_local)
 
-            # -------- ENTER NEW DATA --------
+            # ENTER NEW DATA
             else:
 
                 st.markdown("### Enter Values")
@@ -164,8 +163,15 @@ else:
 
                         with cols[i % 2]:
 
-                            if df_full[col].dtype == "object":
+                            dtype = df_full[col].dtype
+
+                            if dtype == "object":
                                 input_data[col] = st.selectbox(col, df_full[col].dropna().unique())
+
+                            elif set(df_full[col].dropna().unique()).issubset({0,1}):
+                                input_data[col] = st.selectbox(col, [0,1])
+                                st.caption("0 → Not Present, 1 → Present")
+
                             else:
                                 input_data[col] = st.text_input(col)
 
@@ -188,7 +194,7 @@ else:
 
                         st.success(f"Prediction: {pred[0]}")
 
-                        _, fig_local, shap_vals = generate_shap_plots(
+                        _, fig_local, _ = generate_shap_plots(
                             model, X_test[:100], new_processed, feature_names, task
                         )
 

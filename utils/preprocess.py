@@ -22,7 +22,19 @@ def preprocess_data(df, target):
         X_processed, y, test_size=0.2, random_state=42
     )
 
-    feature_names = preprocessor.get_feature_names_out()
+    raw_names = preprocessor.get_feature_names_out()
+
+    # CLEAN NAMES
+    feature_names = []
+    for name in raw_names:
+        if "__" in name:
+            name = name.split("__")[1]
+
+        if "_" in name and name.split("_")[-1].isalpha():
+            parts = name.split("_")
+            feature_names.append(f"{parts[0]} = {parts[-1]}")
+        else:
+            feature_names.append(name)
 
     X_test_original = X.iloc[:len(X_test)]
 

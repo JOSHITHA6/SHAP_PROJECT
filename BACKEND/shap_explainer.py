@@ -15,7 +15,6 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
 
     shap_values = explainer(X_sample)
 
-    # classification fix
     if isinstance(shap_values.values, np.ndarray) and len(shap_values.values.shape) == 3:
         shap_vals = shap_values.values[:, :, 1]
     else:
@@ -24,14 +23,7 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
     plt.close('all')
 
     fig_global = plt.figure()
-
-    shap.summary_plot(
-        shap_vals,
-        X_sample,
-        plot_type="violin",
-        show=False
-    )
-
+    shap.summary_plot(shap_vals, X_sample, plot_type="violin", show=False)
     plt.xlabel("Impact on Prediction")
     plt.ylabel("Features")
 
@@ -52,7 +44,6 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
             base = shap_single.base_values[0]
 
         fig_local = plt.figure()
-
         shap.waterfall_plot(
             shap.Explanation(
                 values=values,
@@ -61,5 +52,8 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
             ),
             show=False
         )
+
+        plt.xlabel("Impact on Prediction")
+        plt.ylabel("Features")
 
     return fig_global, fig_local, shap_vals
