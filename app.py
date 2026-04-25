@@ -52,18 +52,23 @@ if st.session_state.page == "input":
                     df_full
                 ) = preprocess_data(df, target)
 
+                # ✅ INCLUDE TARGET COLUMN IN TEST DISPLAY
+                test_display = X_test_original.copy()
+                test_display[target] = y_test.values
+
                 model = train_model(X_train, y_train, task, model_type)
 
                 st.session_state.update({
                     "model": model,
                     "X_test": X_test,
                     "y_test": y_test,
-                    "test_display": X_test_original.reset_index(drop=True),
+                    "test_display": test_display.reset_index(drop=True),
                     "feature_names": feature_names,
                     "task": task,
                     "preprocessor": preprocessor,
                     "original_columns": original_columns,
-                    "df_full": df_full
+                    "df_full": df_full,
+                    "target": target
                 })
 
                 st.session_state.page = "output"
@@ -86,9 +91,6 @@ elif st.session_state.page == "output":
         test_display = st.session_state.test_display
         feature_names = st.session_state.feature_names
         task = st.session_state.task
-        preprocessor = st.session_state.preprocessor
-        original_columns = st.session_state.original_columns
-        df_full = st.session_state.df_full
 
         left, _, right = st.columns([1.1, 0.1, 1.4])
 
@@ -121,15 +123,41 @@ elif st.session_state.page == "output":
 
                 st.pyplot(fig)
 
-                st.markdown("### 📌 Global Insights")
+            # ---------- LOCAL ----------
+            with tab2:
 
-                vals = np.abs(shap_vals).mean(axis=0)
+                st.markdown("### Select Row for Explanation")
+
+                row = st.number_input("Row Number", 1, len(X_test), 1)
+
+                # ✅ SHOW SELECTED ROW CLEARLY
+                st.markdown("### 📄 Selected Row Data")
+                st.dataframe(test_display.iloc[[row-1]])
+
+                X_single = X_test[row-1:row]
+
+                _, fig_local, shap_vals = generate_shap_plots(
+                    model, X_test[:100], X_single, feature_names, task
+                )
+
+                st.pyplot(fig_local)
+
+                # ✅ FIXED EXPLANATION (NO MISMATCH)
+                st.markdown("### 📌 Why this prediction?")
+
+                shap_row = shap_vals[row-1]
+
+                vals = np.abs(shap_row)
                 perc = (vals / vals.sum()) * 100
 
-                top_idx = np.argsort(vals)[::-1][:5]
+                pairs = sorted(
+                    zip(feature_names, shap_row, perc),
+                    key=lambda x: abs(x[1]),
+                    reverse=True
+                )
 
-                for i in top_idx:
-                    direction = "increases" if np.mean(shap_vals[:, i]) > 0 else "decreases"
+                for feat, val, p in pairs[:5]:
+                    direction = "increases" if val > 0 else "decreases"
 
                     st.markdown(f"""
                     <div style="
@@ -137,111 +165,10 @@ elif st.session_state.page == "output":
                         margin-bottom:10px;
                         background:#f8f9fa;
                         border-radius:10px;
-                        border-left:6px solid {'green' if direction=='increases' else 'red'};
+                        border-left:6px solid {'green' if val>0 else 'red'};
                         font-size:15px;">
-                    <b>{feature_names[i]}</b><br>
-                    👉 Contributes <b>{perc[i]:.1f}%</b><br>
-                    👉 Usually <b>{direction}</b> the prediction
+                    <b>{feat}</b><br>
+                    👉 Contribution: <b>{p:.1f}%</b><br>
+                    👉 This feature <b>{direction}</b> the prediction
                     </div>
                     """, unsafe_allow_html=True)
-
-            # ---------- LOCAL ----------
-            with tab2:
-
-                option = st.radio("Choose Option", ["Select Row", "Enter New Data"])
-
-                # -------- SELECT ROW --------
-                if option == "Select Row":
-
-                    row = st.number_input("Row Number", 1, len(X_test), 1)
-
-                    X_single = X_test[row-1:row]
-
-                    _, fig_local, shap_vals = generate_shap_plots(
-                        model, X_test[:100], X_single, feature_names, task
-                    )
-
-                    st.pyplot(fig_local)
-
-                    st.markdown("### 📌 Why this prediction?")
-
-                    shap_row = shap_vals[row-1]
-                    vals = np.abs(shap_row)
-                    perc = (vals / vals.sum()) * 100
-
-                    pairs = sorted(
-                        zip(feature_names, shap_row, perc),
-                        key=lambda x: abs(x[1]),
-                        reverse=True
-                    )
-
-                    for feat, val, p in pairs[:5]:
-                        direction = "increases" if val > 0 else "decreases"
-
-                        st.markdown(f"""
-                        <div style="
-                            padding:12px;
-                            margin-bottom:10px;
-                            background:#f8f9fa;
-                            border-radius:10px;
-                            border-left:6px solid {'green' if val>0 else 'red'};
-                            font-size:15px;">
-                        <b>{feat}</b><br>
-                        👉 Contribution: <b>{p:.1f}%</b><br>
-                        👉 This feature <b>{direction}</b> the prediction
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                # -------- ENTER NEW DATA --------
-                else:
-
-                    st.markdown("### Enter Values")
-
-                    with st.form("new_input"):
-
-                        input_data = {}
-                        cols = st.columns(2)
-
-                        for i, col in enumerate(original_columns):
-
-                            with cols[i % 2]:
-
-                                unique_vals = df_full[col].dropna().unique()
-
-                                if df_full[col].dtype == "object" or len(unique_vals) <= 10:
-                                    input_data[col] = st.selectbox(col, unique_vals)
-
-                                elif set(unique_vals).issubset({0,1}):
-                                    input_data[col] = st.selectbox(col, [0,1])
-                                    st.caption("0 → Not Present, 1 → Present")
-
-                                else:
-                                    input_data[col] = st.text_input(col)
-
-                        submit = st.form_submit_button("Predict")
-
-                    if submit:
-                        try:
-                            clean = {}
-
-                            for col in input_data:
-                                if df_full[col].dtype != "object":
-                                    clean[col] = float(str(input_data[col]).strip())
-                                else:
-                                    clean[col] = input_data[col]
-
-                            new_df = pd.DataFrame([clean])
-                            new_processed = preprocessor.transform(new_df)
-
-                            pred = model.predict(new_processed)
-
-                            st.success(f"Prediction: {pred[0]}")
-
-                            _, fig_local, _ = generate_shap_plots(
-                                model, X_test[:100], new_processed, feature_names, task
-                            )
-
-                            st.pyplot(fig_local)
-
-                        except:
-                            st.error("⚠️ Enter valid numeric values")
