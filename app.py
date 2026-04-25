@@ -52,7 +52,6 @@ if st.session_state.page == "input":
                     df_full
                 ) = preprocess_data(df, target)
 
-                # include target column
                 test_display = X_test_original.copy()
                 test_display[target] = y_test.values
 
@@ -123,17 +122,15 @@ elif st.session_state.page == "output":
 
                 st.pyplot(fig)
 
-                # 🔥 Overall behavior (instead of wrong "prediction")
                 st.markdown("### 🎯 Overall Model Behavior")
-
-                mean_pred = model.predict(X_test).mean()
 
                 if task == "Classification":
                     majority = (model.predict(X_test) == 1).mean()
                     label = "YES" if majority >= 0.5 else "NO"
-                    st.success(f"👉 The model generally predicts: {label}")
+                    st.success(f"👉 Model tends to predict: {label}")
                 else:
-                    st.success(f"👉 Average predicted value: {round(mean_pred, 3)}")
+                    avg = model.predict(X_test).mean()
+                    st.success(f"👉 Average prediction: {round(avg,3)}")
 
                 st.markdown("### 📌 Why this behavior?")
 
@@ -146,32 +143,21 @@ elif st.session_state.page == "output":
                     direction = "increases" if np.mean(shap_vals[:, i]) > 0 else "decreases"
 
                     st.markdown(f"""
-                    <div style="
-                        padding:12px;
-                        margin-bottom:10px;
-                        background:#f8f9fa;
-                        border-radius:10px;
-                        border-left:6px solid {'green' if direction=='increases' else 'red'};
-                        font-size:15px;">
+                    <div style="padding:10px;background:#f8f9fa;margin-bottom:8px;border-radius:8px;">
                     <b>{feature_names[i]}</b><br>
-                    👉 Contributes <b>{perc[i]:.1f}%</b><br>
-                    👉 Usually <b>{direction}</b> the prediction
+                    {perc[i]:.1f}% contribution → {direction}
                     </div>
                     """, unsafe_allow_html=True)
 
             # ---------- LOCAL ----------
             with tab2:
 
-                st.markdown("### Select Row for Explanation")
+                row = st.number_input("Select Row", 1, len(X_test), 1)
 
-                row = st.number_input("Row Number", 1, len(X_test), 1)
-
-                st.markdown("### 📄 Selected Row Data")
                 st.dataframe(test_display.iloc[[row-1]])
 
                 X_single = X_test[row-1:row]
 
-                # 🔥 PREDICTION + CONFIDENCE
                 pred = model.predict(X_single)[0]
                 actual = y_test.iloc[row-1]
 
@@ -189,23 +175,20 @@ elif st.session_state.page == "output":
                     actual_label = "YES" if actual == 1 else "NO"
 
                     if pred == actual:
-                        st.success(f"✔ Predicted: {pred_label} (Confidence: {confidence:.2f})")
+                        st.success(f"✔ {pred_label} (Confidence: {confidence:.2f})")
                     else:
-                        st.warning(f"⚠️ Predicted: {pred_label} (Confidence: {confidence:.2f})")
+                        st.warning(f"⚠️ {pred_label} (Confidence: {confidence:.2f})")
                         st.info(f"Actual: {actual_label}")
 
                 else:
-                    st.success(f"Predicted: {round(pred,3)} | Actual: {round(actual,3)}")
+                    st.success(f"{round(pred,3)} (Actual: {round(actual,3)})")
 
-                # -------- EXPLAINABILITY --------
+                # SHAP LOCAL
                 _, fig_local, shap_vals = generate_shap_plots(
                     model, X_test[:100], X_single, feature_names, task
                 )
 
                 st.pyplot(fig_local)
-
-                st.markdown("**X-axis:** Impact on Prediction")
-                st.markdown("**Y-axis:** Features")
 
                 st.markdown("### 📌 Why this prediction?")
 
@@ -214,25 +197,5 @@ elif st.session_state.page == "output":
                 vals = np.abs(shap_row)
                 perc = (vals / vals.sum()) * 100
 
-                pairs = sorted(
-                    zip(feature_names, shap_row, perc),
-                    key=lambda x: abs(x[1]),
-                    reverse=True
-                )
-
-                for feat, val, p in pairs[:5]:
-                    direction = "increases" if val > 0 else "decreases"
-
-                    st.markdown(f"""
-                    <div style="
-                        padding:12px;
-                        margin-bottom:10px;
-                        background:#f8f9fa;
-                        border-radius:10px;
-                        border-left:6px solid {'green' if val>0 else 'red'};
-                        font-size:15px;">
-                    <b>{feat}</b><br>
-                    👉 Contribution: <b>{p:.1f}%</b><br>
-                    👉 This feature <b>{direction}</b> the prediction
-                    </div>
-                    """, unsafe_allow_html=True)
+                for feat, val, p in sorted(zip(feature_names, shap_row, perc), key=lambda x: abs(x[1]), reverse=True)[:5]:
+                    st.markdown(f"{feat}: {p:.1f}% → {'increase' if val>0 else 'decrease'}")

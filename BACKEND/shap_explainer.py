@@ -1,72 +1,36 @@
 import shap
 import matplotlib.pyplot as plt
-import pandas as pd
+import matplotlib
 import numpy as np
+import pandas as pd
+
+# 🔥 CRITICAL FIX (prevents $f(x)$ crash)
+matplotlib.rcParams['text.usetex'] = False
+
 
 def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task="Regression"):
 
-    if not isinstance(X_sample, pd.DataFrame):
-        X_sample = pd.DataFrame(X_sample, columns=feature_names)
+    explainer = shap.Explainer(model)
 
-    # -------- EXPLAINER --------
-    if hasattr(model, "estimators_"):
-        explainer = shap.TreeExplainer(model)
-    else:
-        explainer = shap.LinearExplainer(model, X_sample)
-
+    # -------- GLOBAL EXPLANATION --------
     shap_values = explainer(X_sample)
 
-    # -------- HANDLE CLASSIFICATION --------
-    if isinstance(shap_values.values, np.ndarray) and len(shap_values.values.shape) == 3:
-        shap_vals = shap_values.values[:, :, 1]
-    else:
-        shap_vals = shap_values.values
+    plt.figure()
+    shap.summary_plot(shap_values, X_sample, plot_type="violin", show=False)
 
-    # -------- GLOBAL --------
-    plt.close('all')
-    fig_global = plt.figure()
+    fig_global = plt.gcf()
+    plt.close()
 
-    shap.summary_plot(shap_vals, X_sample, plot_type="violin", show=False)
-
-    plt.xlabel("Impact on Prediction", fontsize=12)
-    plt.ylabel("Features", fontsize=12)
-
-    # -------- LOCAL --------
+    # -------- LOCAL EXPLANATION --------
     fig_local = None
 
     if X_single is not None:
-
-        if not isinstance(X_single, pd.DataFrame):
-            X_single = pd.DataFrame(X_single, columns=feature_names)
-
         shap_single = explainer(X_single)
 
-        if isinstance(shap_single.values, np.ndarray) and len(shap_single.values.shape) == 3:
-            values = shap_single.values[0, :, 1]
-            base = shap_single.base_values[0, 1]
-        else:
-            values = shap_single.values[0]
-            base = shap_single.base_values[0]
+        plt.figure()
+        shap.plots.waterfall(shap_single[0], show=False)
 
-        # 🔥 SORT + TAKE TOP FEATURES ONLY (removes grey confusion)
-        idx = np.argsort(np.abs(values))[::-1][:8]
+        fig_local = plt.gcf()
+        plt.close()
 
-        values = values[idx]
-        names = np.array(feature_names)[idx]
-
-        fig_local = plt.figure()
-
-        shap.waterfall_plot(
-            shap.Explanation(
-                values=values,
-                base_values=base,
-                feature_names=names
-            ),
-            show=False
-        )
-
-        # 🔥 FORCE AXIS LABELS INSIDE GRAPH
-        plt.xlabel("Impact on Prediction", fontsize=12)
-        plt.ylabel("Features", fontsize=12)
-
-    return fig_global, fig_local, shap_vals
+    return fig_global, fig_local, shap_values.values
