@@ -103,14 +103,6 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
     }
     
-    /* Secondary button styling */
-    .stButton > button.secondary {
-        background: #6c757d;
-    }
-    .stButton > button.secondary:hover {
-        background: #5a6268;
-    }
-    
     /* Radio button styling */
     .stRadio > div {
         display: flex;
@@ -141,23 +133,9 @@ st.markdown("""
         overflow: hidden;
     }
     
-    /* Section headers */
-    .section-header {
-        margin: 30px 0 20px 0;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #e0e0e0;
-    }
-    
     /* Center align radio buttons */
     div[data-testid="stHorizontalBlock"] {
         justify-content: center;
-    }
-    
-    /* Two button container */
-    .button-container {
-        display: flex;
-        gap: 10px;
-        margin: 20px 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -274,13 +252,10 @@ elif st.session_state.page == "output":
     with col2:
         
         # Add Back to Input button at the top
-        col_back1, col_back2, col_back3 = st.columns([1, 2, 1])
-        with col_back2:
-            if st.button("⬅️ Back to Input", use_container_width=True, key="back_to_input_btn"):
-                # Clear specific session state items to start fresh
-                st.session_state.page = "input"
-                st.session_state.show_explanations = False
-                st.rerun()
+        if st.button("⬅️ Back to Input", use_container_width=True, key="back_to_input_btn"):
+            st.session_state.page = "input"
+            st.session_state.show_explanations = False
+            st.rerun()
         
         st.markdown("---")
         
@@ -629,7 +604,7 @@ elif st.session_state.page == "explanation":
             
             st.markdown("---")
             
-            # ========== UPDATED: Why This Prediction? (Matching Global Pattern) ==========
+            # ========== WHY THIS PREDICTION? (EXACTLY MATCHING GLOBAL PATTERN) ==========
             st.markdown("### 🧠 Why This Prediction?")
             st.markdown("*Here's why the model made this specific prediction:*")
             
@@ -655,7 +630,7 @@ elif st.session_state.page == "explanation":
                     # Sort by absolute impact
                     sorted_indices = np.argsort(np.abs(shap_row))[::-1][:5]
                     
-                    # Display each feature exactly like global explanation
+                    # Display each feature EXACTLY like global explanation (no Value line)
                     for idx in sorted_indices:
                         idx = int(idx)
                         if idx < len(feature_names):
@@ -675,7 +650,7 @@ elif st.session_state.page == "explanation":
                                 color = "#6c757d"
                                 icon = "⚖️"
                             
-                            # Display exactly like global format (without the value line)
+                            # EXACT SAME FORMAT AS GLOBAL - Only Feature, Contribution%, Direction
                             st.markdown(f"""
                             <div class="explanation-box" style="border-left-color: {color};">
                                 <b>{icon} {feature_names[idx]}</b><br>
@@ -686,21 +661,9 @@ elif st.session_state.page == "explanation":
                     
                 except Exception as e:
                     st.warning(f"Could not calculate detailed explanation: {str(e)[:100]}")
-                    # Fallback: Show feature values
-                    st.markdown("**Feature values for this prediction:**")
-                    for i, feat in enumerate(feature_names[:10]):
-                        if i < len(X_single.columns):
-                            value = X_single.iloc[0, i]
-                            st.text(f"{feat}: {value}")
             else:
                 st.warning("SHAP values not available for detailed explanation")
-                # Fallback: Show feature values
-                st.markdown("**Feature values for this prediction:**")
-                for i, feat in enumerate(feature_names[:10]):
-                    if i < len(X_single.columns):
-                        value = X_single.iloc[0, i]
-                        st.text(f"{feat}: {value}")
             
-            st.info("💡 **How to read this:** Features with higher percentages have more influence on this prediction.")
+            st.info("💡 **How to read this:** Features with higher percentages have more influence on predictions.")
     
     st.markdown('</div>', unsafe_allow_html=True)
