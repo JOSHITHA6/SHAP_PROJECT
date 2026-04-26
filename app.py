@@ -103,6 +103,14 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
     }
     
+    /* Secondary button styling */
+    .stButton > button.secondary {
+        background: #6c757d;
+    }
+    .stButton > button.secondary:hover {
+        background: #5a6268;
+    }
+    
     /* Radio button styling */
     .stRadio > div {
         display: flex;
@@ -143,6 +151,13 @@ st.markdown("""
     /* Center align radio buttons */
     div[data-testid="stHorizontalBlock"] {
         justify-content: center;
+    }
+    
+    /* Two button container */
+    .button-container {
+        display: flex;
+        gap: 10px;
+        margin: 20px 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -258,6 +273,17 @@ elif st.session_state.page == "output":
     
     with col2:
         
+        # Add Back to Input button at the top
+        col_back1, col_back2, col_back3 = st.columns([1, 2, 1])
+        with col_back2:
+            if st.button("⬅️ Back to Input", use_container_width=True, key="back_to_input_btn"):
+                # Clear specific session state items to start fresh
+                st.session_state.page = "input"
+                st.session_state.show_explanations = False
+                st.rerun()
+        
+        st.markdown("---")
+        
         # 1. Test Dataset
         st.subheader("📄 Test Dataset")
         st.dataframe(test_display, height=300, use_container_width=True)
@@ -314,10 +340,12 @@ elif st.session_state.page == "explanation":
     X_test_original = st.session_state.X_test_original
     y_pred = st.session_state.y_pred
     
-    # Back button
-    if st.button("⬅️ Back to Results", use_container_width=False):
-        st.session_state.page = "output"
-        st.rerun()
+    # Back button to results
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("⬅️ Back to Results", use_container_width=True):
+            st.session_state.page = "output"
+            st.rerun()
     
     st.title("📖 Model Explainability")
     st.markdown("*Understand why your model makes predictions*")
@@ -449,6 +477,7 @@ elif st.session_state.page == "explanation":
         original_values = None
         current_prediction = None
         current_actual = None
+        shap_values_array = None  # Initialize here
         
         if local_source == "📊 Use Test Data":
             # Option 1: Select existing row
@@ -600,7 +629,7 @@ elif st.session_state.page == "explanation":
             
             st.markdown("---")
             
-            # Why This Prediction?
+            # ========== Why This Prediction? WITH FEATURE CONTRIBUTIONS ==========
             st.markdown("### 🧠 Why This Prediction?")
             st.markdown("*Here's why the model made this specific prediction:*")
             
@@ -626,6 +655,7 @@ elif st.session_state.page == "explanation":
                     # Sort by absolute impact
                     sorted_indices = np.argsort(np.abs(shap_row))[::-1][:5]
                     
+                    # Display each feature with its contribution percentage
                     for idx in sorted_indices:
                         idx = int(idx)
                         if idx < len(feature_names):
@@ -645,7 +675,7 @@ elif st.session_state.page == "explanation":
                                 color = "#6c757d"
                                 icon = "⚖️"
                             
-                            # Get the actual value
+                            # Get the actual value of this feature
                             try:
                                 if idx < len(X_single.columns):
                                     feature_value = X_single.iloc[0, idx]
@@ -660,20 +690,47 @@ elif st.session_state.page == "explanation":
                             except:
                                 value_display = "N/A"
                             
+                            # Display the feature contribution box with percentage prominently shown
                             st.markdown(f"""
                             <div class="explanation-box" style="border-left-color: {color};">
                                 <b>{icon} {feature_names[idx]}</b><br>
                                 → <b>Value:</b> {value_display}<br>
-                                → <b>Contribution:</b> <span style="font-size: 15px; font-weight: bold;">{perc[idx]:.1f}%</span><br>
+                                → <b>Contribution:</b> <span style="font-size: 16px; font-weight: bold; color: {color};">{perc[idx]:.1f}%</span><br>
                                 → {direction}
                             </div>
                             """, unsafe_allow_html=True)
-                            
+                    
+                    # Add a summary of contributions
+                    st.markdown("---")
+                    st.markdown("#### 📊 Contribution Summary")
+                    
+                    # Calculate total positive and negative contributions
+                    positive_sum = sum(perc[idx] for idx in sorted_indices if idx < len(feature_names) and shap_row[idx] > 0.05)
+                    negative_sum = sum(perc[idx] for idx in sorted_indices if idx < len(feature_names) and shap_row[idx] < -0.05)
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("📈 Pushing HIGHER", f"{positive_sum:.1f}%")
+                    with col2:
+                        st.metric("📉 Pushing LOWER", f"{negative_sum:.1f}%")
+                    
                 except Exception as e:
                     st.warning(f"Could not calculate detailed explanation: {str(e)[:100]}")
+                    # Fallback: Show feature values
+                    st.markdown("**Feature values for this prediction:**")
+                    for i, feat in enumerate(feature_names[:10]):
+                        if i < len(X_single.columns):
+                            value = X_single.iloc[0, i]
+                            st.text(f"{feat}: {value}")
             else:
                 st.warning("SHAP values not available for detailed explanation")
+                # Fallback: Show feature values
+                st.markdown("**Feature values for this prediction:**")
+                for i, feat in enumerate(feature_names[:10]):
+                    if i < len(X_single.columns):
+                        value = X_single.iloc[0, i]
+                        st.text(f"{feat}: {value}")
             
-            st.info("💡 **What this means:** The percentages show how much each feature contributed to this specific prediction.")
+            st.info("💡 **What this means:** The percentages show how much each feature contributed to this specific prediction. Green features pushed the prediction higher, red features pushed it lower.")
     
     st.markdown('</div>', unsafe_allow_html=True)
