@@ -11,64 +11,130 @@ from sklearn.metrics import accuracy_score, r2_score
 
 st.set_page_config(layout="wide", page_title="SHAP AI Explainability Tool", page_icon="📊")
 
-# Custom CSS for consistent box styling
+# Custom CSS for clean, minimal UI
 st.markdown("""
 <style>
+    /* Main container styling */
+    .main-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    /* Clean explanation box */
     .explanation-box {
-        padding: 12px;
-        margin-bottom: 10px;
-        background: #f8f9fa;
-        border-radius: 10px;
-        border-left: 6px solid;
+        padding: 15px;
+        margin-bottom: 12px;
+        background: #ffffff;
+        border-radius: 8px;
+        border-left: 4px solid;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         transition: all 0.2s ease;
     }
     .explanation-box:hover {
-        background: #f0f2f6;
-        transform: translateX(5px);
+        background: #fafafa;
+        transform: translateX(3px);
     }
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    
+    /* Light prediction card */
+    .prediction-card-light {
+        background: #f8f9fa;
         padding: 20px;
-        border-radius: 15px;
-        color: white;
+        border-radius: 12px;
         text-align: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border: 1px solid #e0e0e0;
+        margin: 20px 0;
     }
-    .metric-card h3 {
+    .prediction-card-light h3 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        color: #666;
+        font-weight: 500;
+    }
+    .prediction-card-light h1 {
+        margin: 0;
+        font-size: 32px;
+        font-weight: 600;
+        color: #333;
+    }
+    .prediction-card-light p {
+        margin: 10px 0 0 0;
+        font-size: 12px;
+        color: #888;
+    }
+    
+    /* Metric card light */
+    .metric-card-light {
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+        border: 1px solid #e0e0e0;
+        margin: 20px 0;
+    }
+    .metric-card-light h3 {
         margin: 0;
         font-size: 14px;
-        opacity: 0.9;
+        color: #666;
+        font-weight: 500;
     }
-    .metric-card h1 {
+    .metric-card-light h1 {
         margin: 10px 0 0 0;
         font-size: 36px;
-        font-weight: bold;
+        font-weight: 600;
+        color: #2c3e50;
     }
-    .axis-label {
-        background: #f0f2f6;
-        padding: 8px 12px;
-        border-radius: 8px;
-        margin: 5px 0;
-        font-family: monospace;
-        font-size: 14px;
-    }
-    .behavior-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 15px;
-        border-radius: 10px;
-        color: white;
-        margin-bottom: 20px;
-        text-align: center;
-    }
-    .contribution-badge {
+    
+    /* Button styling */
+    .stButton > button {
         background: #667eea;
         color: white;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: bold;
-        display: inline-block;
+        border: none;
+        padding: 10px 30px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    .stButton > button:hover {
+        background: #5a67d8;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    
+    /* Toggle button styling */
+    .stRadio > div {
+        gap: 10px;
+    }
+    .stRadio label {
+        background: #f0f2f6;
+        padding: 8px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+    }
+    
+    /* Axis label styling */
+    .axis-label {
+        background: #f8f9fa;
+        padding: 8px 15px;
+        border-radius: 6px;
+        margin: 8px 0;
+        font-size: 13px;
+        color: #555;
+        border-left: 3px solid #667eea;
+    }
+    
+    /* Dataframe styling */
+    .dataframe {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    /* Section headers */
+    .section-header {
+        margin: 30px 0 20px 0;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e0e0e0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -77,14 +143,19 @@ st.markdown("""
 if "page" not in st.session_state:
     st.session_state.page = "input"
     
+if "show_explanations" not in st.session_state:
+    st.session_state.show_explanations = False
+    
 if "preprocessor" not in st.session_state:
     st.session_state.preprocessor = None
     
 if "original_df" not in st.session_state:
     st.session_state.original_df = None
 
-# ================= INPUT PAGE =================
+# ================= PAGE 1: INPUT PAGE =================
 if st.session_state.page == "input":
+    
+    st.markdown('<div class="main-container">', unsafe_allow_html=True)
     
     st.title("🔮 SHAP - AI Model Explainability Tool")
     st.markdown("*Upload any dataset, train a model, and understand exactly WHY it makes predictions*")
@@ -120,7 +191,7 @@ if st.session_state.page == "input":
                 model_type = st.selectbox("🤖 Select Model", ["Random Forest", "Linear Regression"])
         
         # Run button
-        if st.button("🚀 Run Model & Generate Explanations", type="primary", use_container_width=True):
+        if st.button("🚀 Run Model", type="primary", use_container_width=True):
             
             with st.spinner("🔄 Processing data and training model..."):
                 # Preprocess data
@@ -147,24 +218,80 @@ if st.session_state.page == "input":
                     "target_name": target,
                     "preprocessor": preprocessor,
                     "original_columns": original_columns,
-                    "X_test_original": X_test_original
+                    "X_test_original": X_test_original,
+                    "y_pred": model.predict(X_test)
                 })
                 
                 st.session_state.page = "output"
                 st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# ================= OUTPUT PAGE =================
+# ================= PAGE 2: OUTPUT PAGE =================
 elif st.session_state.page == "output":
     
-    st.title("📊 Model Output & Explainability Dashboard")
-    st.markdown("*Understand what your model learned and why it makes each prediction*")
+    st.markdown('<div class="main-container">', unsafe_allow_html=True)
     
-    # Back button
-    if st.button("⬅️ Back to Upload", use_container_width=True):
-        st.session_state.page = "input"
-        st.rerun()
+    # Load session data
+    model = st.session_state.model
+    X_test = st.session_state.X_test
+    y_test = st.session_state.y_test
+    test_display = st.session_state.test_display
+    task = st.session_state.task
+    target_name = st.session_state.target_name
+    y_pred = st.session_state.y_pred
     
+    # Title
+    st.title("📊 Model Results")
     st.markdown("---")
+    
+    # Center aligned content
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        
+        # 1. Test Dataset
+        st.subheader("📄 Test Dataset")
+        st.dataframe(test_display, height=300, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # 2. Model Performance
+        st.subheader("📈 Model Performance")
+        
+        if task == "Classification":
+            acc = accuracy_score(y_test, y_pred)
+            st.markdown(f"""
+            <div class="metric-card-light">
+                <h3>🎯 Accuracy Score</h3>
+                <h1>{acc:.2%}</h1>
+                <p>Correct predictions / Total predictions</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            r2 = r2_score(y_test, y_pred)
+            st.markdown(f"""
+            <div class="metric-card-light">
+                <h3>📊 R² Score</h3>
+                <h1>{r2:.3f}</h1>
+                <p>Coefficient of Determination (1.0 = perfect)</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # 3. View Explanations Button
+        st.markdown("---")
+        
+        if st.button("🔍 View Explanations?", type="primary", use_container_width=True):
+            st.session_state.show_explanations = True
+            st.session_state.page = "explanation"
+            st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ================= PAGE 3: EXPLANATION PAGE =================
+elif st.session_state.page == "explanation":
+    
+    st.markdown('<div class="main-container">', unsafe_allow_html=True)
     
     # Load session data
     model = st.session_state.model
@@ -177,567 +304,366 @@ elif st.session_state.page == "output":
     preprocessor = st.session_state.preprocessor
     original_columns = st.session_state.original_columns
     X_test_original = st.session_state.X_test_original
+    y_pred = st.session_state.y_pred
     
-    # Create two columns
-    left_col, right_col = st.columns([1.1, 1.4], gap="large")
+    # Back button
+    if st.button("⬅️ Back to Results", use_container_width=False):
+        st.session_state.page = "output"
+        st.rerun()
     
-    # ========== LEFT COLUMN ==========
-    with left_col:
+    st.title("📖 Model Explainability")
+    st.markdown("*Understand why your model makes predictions*")
+    st.markdown("---")
+    
+    # Toggle for Global/Local Explanation
+    explanation_type = st.radio(
+        "Select Explanation Type",
+        ["🌍 Global Explanation", "🔍 Local Explanation"],
+        horizontal=True,
+        use_container_width=True
+    )
+    
+    st.markdown("---")
+    
+    # ========== GLOBAL EXPLANATION ==========
+    if explanation_type == "🌍 Global Explanation":
         
-        st.subheader("📄 Test Dataset (20% of data)")
-        st.dataframe(test_display, height=400, use_container_width=True)
+        st.subheader("🌍 How Features Impact Predictions")
+        
+        # Generate SHAP plots
+        with st.spinner("Calculating feature impacts..."):
+            result = generate_shap_plots(
+                model, X_test[:100], feature_names=feature_names, task=task
+            )
+            
+            if len(result) == 3:
+                fig_global, _, shap_values_array = result
+            else:
+                st.warning("SHAP explanation could not be generated.")
+                fig_global = None
+                shap_values_array = None
+        
+        # Display SHAP graph with axis labels
+        if fig_global:
+            st.pyplot(fig_global, use_container_width=True)
+            
+            # Axis labels (one below the other)
+            st.markdown('<div class="axis-label">📊 X-axis = Feature Impact on Model Output</div>', unsafe_allow_html=True)
+            st.markdown('<div class="axis-label">📈 Y-axis = Features</div>', unsafe_allow_html=True)
         
         st.markdown("---")
-        st.subheader("📈 Model Performance")
         
-        # Make predictions
-        y_pred = model.predict(X_test)
+        # Overall Prediction
+        st.markdown("### 🎯 Overall Model Prediction")
         
-        # Display single metric in a nice card
         if task == "Classification":
-            acc = accuracy_score(y_test, y_pred)
+            from collections import Counter
+            majority_pred = Counter(y_pred).most_common(1)[0][0]
             st.markdown(f"""
-            <div class="metric-card">
-                <h3>🎯 Accuracy Score</h3>
-                <h1>{acc:.2%}</h1>
-                <p style="margin-top:10px;font-size:12px;opacity:0.8">Correct predictions / Total predictions</p>
+            <div class="prediction-card-light">
+                <h3>The model generally predicts:</h3>
+                <h1>{majority_pred}</h1>
             </div>
             """, unsafe_allow_html=True)
-            
-            # Show sample predictions
-            with st.expander("🔍 View Sample Predictions"):
-                sample_df = test_display.head(10).copy()
-                sample_df["Prediction"] = y_pred[:10]
-                st.dataframe(sample_df, use_container_width=True)
-                
         else:
-            r2 = r2_score(y_test, y_pred)
+            avg_pred = np.mean(y_pred)
             st.markdown(f"""
-            <div class="metric-card">
-                <h3>📊 R² Score (Coefficient of Determination)</h3>
-                <h1>{r2:.3f}</h1>
-                <p style="margin-top:10px;font-size:12px;opacity:0.8">Higher = Better (1.0 = perfect prediction)</p>
+            <div class="prediction-card-light">
+                <h3>Average predicted value:</h3>
+                <h1>{avg_pred:.3f}</h1>
             </div>
             """, unsafe_allow_html=True)
-            
-            # Show sample predictions
-            with st.expander("🔍 View Sample Predictions"):
-                sample_df = test_display.head(10).copy()
-                sample_df["Prediction"] = y_pred[:10]
-                st.dataframe(sample_df, use_container_width=True)
-    
-    # ========== RIGHT COLUMN ==========
-    with right_col:
         
-        tab1, tab2 = st.tabs(["🌍 Global Explainability", "🔍 Local Explainability"])
+        st.markdown("---")
         
-        # ---------- GLOBAL EXPLAINABILITY TAB ----------
-        with tab1:
-            st.subheader("🌍 How Features Impact Predictions (Global)")
-            
-            # Generate SHAP plots
-            with st.spinner("Calculating feature impacts..."):
-                result = generate_shap_plots(
-                    model, X_test[:100], feature_names=feature_names, task=task
-                )
-                
-                # Handle different return formats
-                if len(result) == 3:
-                    fig_global, _, shap_values_array = result
+        # Why This Behavior?
+        st.markdown("### 🧠 Why This Behavior?")
+        st.markdown("*Here's what the model learned from your data:*")
+        
+        # Calculate feature importance from SHAP values
+        if shap_values_array is not None and len(shap_values_array) > 0:
+            try:
+                vals = np.abs(shap_values_array).mean(axis=0).flatten()
+                if vals.sum() > 0:
+                    perc = (vals / vals.sum()) * 100
                 else:
-                    st.warning("SHAP explanation could not be generated. Showing feature importance from model.")
-                    fig_global = None
+                    perc = np.zeros_like(vals)
+                
+                # Get top 5 features
+                top_indices = np.argsort(vals)[::-1][:5]
+                
+                for idx in top_indices:
+                    idx = int(idx)
+                    mean_shap = np.mean(shap_values_array[:, idx])
+                    
+                    # Determine direction
+                    if mean_shap > 0.05:
+                        direction = "pushes prediction HIGHER"
+                        color = "#28a745"
+                        icon = "📈"
+                    elif mean_shap < -0.05:
+                        direction = "pushes prediction LOWER"
+                        color = "#dc3545"
+                        icon = "📉"
+                    else:
+                        direction = "has mixed or minimal impact"
+                        color = "#6c757d"
+                        icon = "⚖️"
+                    
+                    st.markdown(f"""
+                    <div class="explanation-box" style="border-left-color: {color};">
+                        <b>{icon} {feature_names[idx]}</b><br>
+                        → <b>Contribution: {perc[idx]:.1f}%</b> of total impact<br>
+                        → {direction}
+                    </div>
+                    """, unsafe_allow_html=True)
+            except Exception as e:
+                st.warning(f"Could not calculate SHAP feature impacts: {str(e)[:100]}")
+        
+        st.info("💡 **How to read this:** Features with higher percentages have more influence on predictions.")
+    
+    # ========== LOCAL EXPLANATION ==========
+    else:
+        
+        st.subheader("🔍 Explain a Single Prediction")
+        
+        # Two options for local explanation
+        local_source = st.radio(
+            "Choose input method:",
+            ["📊 Use Test Data", "✏️ Enter New Data"],
+            horizontal=True,
+            use_container_width=True
+        )
+        
+        X_single = None
+        original_values = None
+        current_prediction = None
+        current_actual = None
+        
+        if local_source == "📊 Use Test Data":
+            # Option 1: Select existing row
+            max_row = len(X_test)
+            row_num = st.number_input("Select row number to explain", min_value=1, max_value=max_row, value=1, step=1)
+            
+            st.markdown("---")
+            st.markdown("### 📋 Selected Data Row")
+            st.dataframe(test_display.iloc[[row_num - 1]], use_container_width=True)
+            
+            X_single = X_test.iloc[row_num - 1:row_num]
+            current_prediction = model.predict(X_single)[0]
+            current_actual = y_test.iloc[row_num - 1]
+            
+        else:
+            # Option 2: Enter new data
+            st.markdown("### 📝 Enter New Data")
+            
+            if st.session_state.X_test_original is not None:
+                new_data_dict = {}
+                original_df = st.session_state.original_df
+                
+                # Create 2 columns for better layout
+                num_cols = 2
+                feature_cols = st.columns(num_cols)
+                
+                for idx, feature in enumerate(original_columns):
+                    col_idx = idx % num_cols
+                    with feature_cols[col_idx]:
+                        if feature in original_df.columns:
+                            unique_vals = original_df[feature].nunique()
+                            
+                            if unique_vals <= 10:  # Categorical
+                                categories = original_df[feature].dropna().unique().tolist()
+                                categories.sort()
+                                
+                                if unique_vals == 2:  # Binary
+                                    if set(categories) == {0, 1}:
+                                        display_categories = ["No (0)", "Yes (1)"]
+                                        value_map = {"No (0)": 0, "Yes (1)": 1}
+                                    else:
+                                        display_categories = [str(c) for c in categories]
+                                        value_map = {str(c): c for c in categories}
+                                    
+                                    selected = st.selectbox(f"🔘 {feature}", options=display_categories)
+                                    new_data_dict[feature] = value_map[selected]
+                                else:
+                                    selected = st.selectbox(f"📋 {feature}", options=[str(c) for c in categories])
+                                    for cat in categories:
+                                        if str(cat) == selected:
+                                            new_data_dict[feature] = cat
+                                            break
+                            else:  # Numerical
+                                min_val = float(original_df[feature].min())
+                                max_val = float(original_df[feature].max())
+                                mean_val = float(original_df[feature].mean())
+                                
+                                new_data_dict[feature] = st.number_input(
+                                    f"🔢 {feature}",
+                                    value=mean_val,
+                                    min_value=min_val,
+                                    max_value=max_val,
+                                    step=(max_val - min_val) / 100 if max_val > min_val else 1.0,
+                                    format="%.4f" if abs(max_val - min_val) < 1 else "%.2f"
+                                )
+                
+                if st.button("🔮 Generate Prediction", type="primary", use_container_width=True):
+                    try:
+                        new_data_df = pd.DataFrame([new_data_dict])
+                        X_single_processed = preprocessor.transform(new_data_df)
+                        X_single = pd.DataFrame(X_single_processed, columns=feature_names)
+                        current_prediction = model.predict(X_single)[0]
+                        original_values = new_data_dict
+                        st.success("✅ Prediction generated!")
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
+                        X_single = None
+                
+                if X_single is None:
+                    st.info("👈 Fill in the values and click 'Generate Prediction'")
+        
+        # Display prediction and explanation if available
+        if X_single is not None:
+            
+            # Light prediction box
+            if task == "Classification":
+                if local_source == "📊 Use Test Data":
+                    st.markdown(f"""
+                    <div class="prediction-card-light">
+                        <h3>🎯 Model Prediction</h3>
+                        <h1>{current_prediction}</h1>
+                        <p>Actual: {current_actual}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="prediction-card-light">
+                        <h3>🎯 Model Prediction</h3>
+                        <h1>{current_prediction}</h1>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                if local_source == "📊 Use Test Data":
+                    actual = current_actual
+                    diff = current_prediction - actual
+                    diff_symbol = "▲" if diff > 0 else "▼" if diff < 0 else "●"
+                    st.markdown(f"""
+                    <div class="prediction-card-light">
+                        <h3>🎯 Model Prediction</h3>
+                        <h1>{current_prediction:.2f}</h1>
+                        <p>Actual: {actual:.2f} ({diff_symbol} {abs(diff):.2f})</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="prediction-card-light">
+                        <h3>🎯 Model Prediction</h3>
+                        <h1>{current_prediction:.2f}</h1>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            # Generate local SHAP explanation
+            with st.spinner("Generating explanation..."):
+                try:
+                    result = generate_shap_plots(
+                        model, X_test[:100], X_single, feature_names, task
+                    )
+                    
+                    if len(result) == 3:
+                        fig_global, fig_local, shap_values_array = result
+                    else:
+                        fig_global, fig_local = result
+                        shap_values_array = None
+                except Exception as e:
+                    st.error(f"Could not generate SHAP explanation: {str(e)}")
+                    fig_local = None
                     shap_values_array = None
             
-            # Display the plot
-            if fig_global:
-                st.pyplot(fig_global, use_container_width=True)
-                st.caption("📌 Each violin shows how much a feature influences predictions across all data points")
+            # Display SHAP graph
+            if fig_local:
+                st.markdown("### 📊 Feature Contributions")
+                st.pyplot(fig_local, use_container_width=True)
+                
+                # Axis labels (one below the other)
+                st.markdown('<div class="axis-label">📊 X-axis = Impact on Prediction</div>', unsafe_allow_html=True)
+                st.markdown('<div class="axis-label">📈 Y-axis = Features</div>', unsafe_allow_html=True)
             else:
-                # Fallback to feature importance from model
-                if hasattr(model, 'feature_importances_'):
-                    importances = model.feature_importances_
-                    indices = np.argsort(importances)[::-1][:10]
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    ax.barh(range(len(indices)), importances[indices])
-                    ax.set_yticks(range(len(indices)))
-                    ax.set_yticklabels([feature_names[i] for i in indices])
-                    ax.set_xlabel("Feature Importance")
-                    ax.set_title("Feature Importance (Model-based)")
-                    st.pyplot(fig)
-                    plt.close()
+                st.warning("Local explanation plot could not be generated.")
             
             st.markdown("---")
             
-            # ========== GLOBAL: OVERALL MODEL PREDICTION SECTION ==========
-            st.markdown("### 🎯 Overall Model Prediction")
+            # Why This Prediction?
+            st.markdown("### 🧠 Why This Prediction?")
+            st.markdown("*Here's why the model made this specific prediction:*")
             
-            if task == "Classification":
-                # Get majority prediction
-                from collections import Counter
-                majority_pred = Counter(y_pred).most_common(1)[0][0]
-                st.markdown(f"""
-                <div class="explanation-box" style="border-left-color: #667eea; background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);">
-                    <b>📊 The model generally predicts:</b><br>
-                    <span style="font-size: 20px; font-weight: bold;">{majority_pred}</span>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                # Get average predicted value
-                avg_pred = np.mean(y_pred)
-                st.markdown(f"""
-                <div class="explanation-box" style="border-left-color: #667eea; background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);">
-                    <b>📊 Average predicted value:</b><br>
-                    <span style="font-size: 20px; font-weight: bold;">{avg_pred:.3f}</span>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            st.markdown("---")
-            st.markdown("### 🧠 Why This Behavior?")
-            st.markdown("*Here's what the model learned from your data:*")
-            
-            # Calculate feature importance from SHAP values if available
+            # Get SHAP values for this specific row
             if shap_values_array is not None and len(shap_values_array) > 0:
                 try:
-                    vals = np.abs(shap_values_array).mean(axis=0).flatten()
+                    # Get the correct shap row
+                    if len(shap_values_array.shape) == 2:
+                        if len(shap_values_array) == 1:
+                            shap_row = shap_values_array[0].flatten()
+                        else:
+                            shap_row = shap_values_array.flatten()
+                    else:
+                        shap_row = shap_values_array.flatten()
+                    
+                    # Calculate percentages
+                    vals = np.abs(shap_row)
                     if vals.sum() > 0:
                         perc = (vals / vals.sum()) * 100
                     else:
                         perc = np.zeros_like(vals)
                     
-                    # Get top 5 features
-                    top_indices = np.argsort(vals)[::-1][:5]
+                    # Sort by absolute impact
+                    sorted_indices = np.argsort(np.abs(shap_row))[::-1][:5]
                     
-                    for idx in top_indices:
+                    for idx in sorted_indices:
                         idx = int(idx)
-                        mean_shap = np.mean(shap_values_array[:, idx])
-                        
-                        # Determine direction and color
-                        if mean_shap > 0.05:
-                            direction = "pushes prediction HIGHER"
-                            color = "#28a745"
-                            icon = "📈"
-                        elif mean_shap < -0.05:
-                            direction = "pushes prediction LOWER"
-                            color = "#dc3545"
-                            icon = "📉"
-                        else:
-                            direction = "has mixed or minimal impact"
-                            color = "#6c757d"
-                            icon = "⚖️"
-                        
-                        st.markdown(f"""
-                        <div class="explanation-box" style="border-left-color: {color};">
-                            <b>{icon} {feature_names[idx]}</b><br>
-                            → <b>Contribution: {perc[idx]:.1f}%</b> of total impact<br>
-                            → {direction}
-                        </div>
-                        """, unsafe_allow_html=True)
-                except Exception as e:
-                    st.warning(f"Could not calculate SHAP feature impacts: {str(e)[:100]}")
-            else:
-                # Fallback to model feature importance
-                if hasattr(model, 'feature_importances_'):
-                    importances = model.feature_importances_
-                    indices = np.argsort(importances)[::-1][:5]
-                    for idx in indices:
-                        st.markdown(f"""
-                        <div class="explanation-box" style="border-left-color: #667eea;">
-                            <b>📊 {feature_names[idx]}</b><br>
-                            → <b>Importance: {importances[idx]*100:.1f}%</b><br>
-                            → This feature strongly influences predictions
-                        </div>
-                        """, unsafe_allow_html=True)
-            
-            st.info("💡 **How to read this:** Features with higher percentages have more influence on predictions. The direction tells you whether higher feature values generally increase or decrease the prediction.")
-        
-        # ---------- LOCAL EXPLAINABILITY TAB (ENHANCED WITH PERCENTAGES) ----------
-        with tab2:
-            st.subheader("🔍 Explain a Single Prediction")
-            
-            # ========== Two options for local explanation ==========
-            explanation_source = st.radio(
-                "Choose input method:",
-                ["📊 Select Row from Test Data", "✏️ Enter New Data"],
-                horizontal=True,
-                help="Select existing test data row or enter your own values"
-            )
-            
-            X_single = None
-            original_values = None
-            
-            if explanation_source == "📊 Select Row from Test Data":
-                # Option 1: Select existing row
-                max_row = len(X_test)
-                row_num = st.number_input("Select row number to explain", min_value=1, max_value=max_row, value=1, step=1)
-                
-                st.markdown("---")
-                st.markdown("### 📋 Selected Data Row")
-                st.dataframe(test_display.iloc[[row_num - 1]], use_container_width=True)
-                
-                X_single = X_test.iloc[row_num - 1:row_num]
-                current_prediction = model.predict(X_single)[0]
-                current_actual = y_test.iloc[row_num - 1]
-                
-            else:
-                # Option 2: Enter new data
-                st.markdown("### 📝 Enter New Data for Prediction")
-                st.markdown("*Fill in the values below to see what the model would predict*")
-                
-                # Get original feature information from the training data
-                if st.session_state.X_test_original is not None:
-                    # Create input fields dynamically based on original feature types
-                    new_data_dict = {}
-                    
-                    # Get original dataframe for categorical value references
-                    original_df = st.session_state.original_df
-                    
-                    # Create columns for better layout
-                    num_cols = 2
-                    feature_cols = st.columns(num_cols)
-                    
-                    for idx, feature in enumerate(original_columns):
-                        col_idx = idx % num_cols
-                        with feature_cols[col_idx]:
-                            # Determine feature type from original data
-                            if feature in original_df.columns:
-                                unique_vals = original_df[feature].nunique()
-                                
-                                # Check if it's categorical or binary
-                                if unique_vals <= 10:  # Treat as categorical
-                                    categories = original_df[feature].dropna().unique().tolist()
-                                    # Sort categories for better UX
-                                    categories.sort()
-                                    
-                                    # Handle binary specially
-                                    if unique_vals == 2:
-                                        # Try to map to Yes/No if values are 0/1
-                                        if set(categories) == {0, 1}:
-                                            display_categories = ["No (0)", "Yes (1)"]
-                                            value_map = {"No (0)": 0, "Yes (1)": 1}
-                                        else:
-                                            display_categories = [str(c) for c in categories]
-                                            value_map = {str(c): c for c in categories}
-                                        
-                                        selected = st.selectbox(
-                                            f"🔘 {feature}",
-                                            options=display_categories,
-                                            help=f"Select value for {feature}"
-                                        )
-                                        new_data_dict[feature] = value_map[selected]
-                                    else:
-                                        # Multi-class categorical
-                                        selected = st.selectbox(
-                                            f"📋 {feature}",
-                                            options=[str(c) for c in categories],
-                                            help=f"Select category for {feature}"
-                                        )
-                                        # Find original value
-                                        for cat in categories:
-                                            if str(cat) == selected:
-                                                new_data_dict[feature] = cat
-                                                break
-                                else:
-                                    # Numerical feature
-                                    min_val = float(original_df[feature].min())
-                                    max_val = float(original_df[feature].max())
-                                    mean_val = float(original_df[feature].mean())
-                                    
-                                    new_data_dict[feature] = st.number_input(
-                                        f"🔢 {feature}",
-                                        value=mean_val,
-                                        min_value=min_val,
-                                        max_value=max_val,
-                                        step=(max_val - min_val) / 100 if max_val > min_val else 1.0,
-                                        format="%.4f" if abs(max_val - min_val) < 1 else "%.2f",
-                                        help=f"Range: [{min_val:.2f}, {max_val:.2f}]"
-                                    )
+                        if idx < len(feature_names):
+                            shap_val = shap_row[idx]
+                            
+                            # Determine direction
+                            if shap_val > 0.05:
+                                direction = "pushes prediction HIGHER"
+                                color = "#28a745"
+                                icon = "📈"
+                            elif shap_val < -0.05:
+                                direction = "pushes prediction LOWER"
+                                color = "#dc3545"
+                                icon = "📉"
                             else:
-                                # Fallback to number input
-                                new_data_dict[feature] = st.number_input(f"🔢 {feature}", value=0.0)
-                    
-                    # Convert to DataFrame
-                    if st.button("🔮 Generate Prediction", type="primary", use_container_width=True):
-                        try:
-                            # Create DataFrame with new data
-                            new_data_df = pd.DataFrame([new_data_dict])
+                                direction = "has minimal impact on this prediction"
+                                color = "#6c757d"
+                                icon = "⚖️"
                             
-                            # Apply the same preprocessing pipeline
-                            X_single_processed = preprocessor.transform(new_data_df)
-                            
-                            # Convert to DataFrame with feature names
-                            X_single = pd.DataFrame(X_single_processed, columns=feature_names)
-                            
-                            current_prediction = model.predict(X_single)[0]
-                            current_actual = None  # No actual value for new data
-                            original_values = new_data_dict
-                            
-                            st.success("✅ Prediction generated successfully!")
-                        except Exception as e:
-                            st.error(f"Error processing input: {str(e)}")
-                            st.info("Please check your input values and try again.")
-                            X_single = None
-                    
-                    if X_single is None:
-                        st.info("👈 Fill in the values above and click 'Generate Prediction'")
-                
-                else:
-                    st.warning("No reference data available for input fields")
-            
-            # Display prediction if we have one
-            if X_single is not None:
-                # Format prediction for display
-                if task == "Classification":
-                    if explanation_source == "📊 Select Row from Test Data":
-                        is_correct = current_prediction == current_actual
-                        st.markdown(f"""
-                        <div class="metric-card" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
-                            <h3>🎯 Model Prediction</h3>
-                            <h1>{current_prediction}</h1>
-                            <p style="margin-top:10px;font-size:12px;opacity:0.8">Actual: {current_actual}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                        <div class="metric-card" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
-                            <h3>🎯 Model Prediction</h3>
-                            <h1>{current_prediction}</h1>
-                        </div>
-                        """, unsafe_allow_html=True)
-                else:
-                    if explanation_source == "📊 Select Row from Test Data":
-                        actual = current_actual
-                        diff = current_prediction - actual
-                        diff_symbol = "▲" if diff > 0 else "▼" if diff < 0 else "●"
-                        st.markdown(f"""
-                        <div class="metric-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                            <h3>🎯 Model Prediction</h3>
-                            <h1>{current_prediction:.2f}</h1>
-                            <p style="margin-top:10px;font-size:12px;opacity:0.8">Actual: {actual:.2f} ({diff_symbol} {abs(diff):.2f})</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                        <div class="metric-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                            <h3>🎯 Model Prediction</h3>
-                            <h1>{current_prediction:.2f}</h1>
-                        </div>
-                        """, unsafe_allow_html=True)
-                
-                # Generate local SHAP explanation
-                with st.spinner("Generating explanation..."):
-                    try:
-                        result = generate_shap_plots(
-                            model, X_test[:100], X_single, feature_names, task
-                        )
-                        
-                        if len(result) == 3:
-                            fig_global, fig_local, shap_values_array = result
-                        else:
-                            fig_global, fig_local = result
-                            shap_values_array = None
-                    except Exception as e:
-                        st.error(f"Could not generate SHAP explanation: {str(e)}")
-                        fig_local = None
-                        shap_values_array = None
-                
-                # Display waterfall plot
-                if fig_local:
-                    st.markdown("### 📊 How Each Feature Contributed")
-                    st.pyplot(fig_local, use_container_width=True)
-                    
-                    # Axis labels (one below the other)
-                    st.markdown("---")
-                    st.markdown("### 📐 Chart Explanation")
-                    st.markdown('<div class="axis-label">📊 X-axis = Impact on Prediction</div>', unsafe_allow_html=True)
-                    st.markdown('<div class="axis-label">📈 Y-axis = Features</div>', unsafe_allow_html=True)
-                else:
-                    st.warning("Local explanation plot could not be generated.")
-                
-                st.markdown("---")
-                
-                # ========== LOCAL: WHY THIS BEHAVIOR? SECTION WITH PERCENTAGES ==========
-                st.markdown("### 🧠 Why This Behavior?")
-                st.markdown("*Here's why the model made this specific prediction:*")
-                
-                # Get SHAP values for this specific row if available
-                if shap_values_array is not None and len(shap_values_array) > 0:
-                    try:
-                        # Get the correct index
-                        if len(shap_values_array.shape) == 2:
-                            if len(shap_values_array) == 1:
-                                shap_row = shap_values_array[0].flatten()
-                            else:
-                                shap_row = shap_values_array.flatten()
-                        else:
-                            shap_row = shap_values_array.flatten()
-                        
-                        # Calculate percentages for this row
-                        vals = np.abs(shap_row)
-                        if vals.sum() > 0:
-                            perc = (vals / vals.sum()) * 100
-                        else:
-                            perc = np.zeros_like(vals)
-                        
-                        # Sort by absolute impact
-                        sorted_indices = np.argsort(np.abs(shap_row))[::-1][:5]
-                        
-                        # Store explanations for summary
-                        explanations = []
-                        
-                        # Display header for percentage contributions
-                        st.markdown("#### 📊 Feature Contributions (by percentage)")
-                        
-                        for idx in sorted_indices:
-                            idx = int(idx)
-                            if idx < len(feature_names):
-                                shap_val = shap_row[idx]
-                                
-                                # Determine direction and color
-                                if shap_val > 0.05:
-                                    direction = "pushes prediction HIGHER"
-                                    color = "#28a745"
-                                    icon = "📈"
-                                    effect = "positive"
-                                elif shap_val < -0.05:
-                                    direction = "pushes prediction LOWER"
-                                    color = "#dc3545"
-                                    icon = "📉"
-                                    effect = "negative"
-                                else:
-                                    direction = "has minimal impact on this prediction"
-                                    color = "#6c757d"
-                                    icon = "⚖️"
-                                    effect = "neutral"
-                                
-                                # Get the actual value of this feature
-                                try:
-                                    if idx < len(X_single.columns):
-                                        feature_value = X_single.iloc[0, idx]
-                                        if isinstance(feature_value, (int, float)):
-                                            if isinstance(feature_value, float):
-                                                value_display = f"{feature_value:.3f}"
-                                            else:
-                                                value_display = str(feature_value)
-                                        else:
-                                            value_display = str(feature_value)
-                                    elif original_values and feature_names[idx] in original_values:
-                                        value_display = str(original_values[feature_names[idx]])
+                            # Get the actual value
+                            try:
+                                if idx < len(X_single.columns):
+                                    feature_value = X_single.iloc[0, idx]
+                                    if isinstance(feature_value, (int, float)):
+                                        value_display = f"{feature_value:.3f}" if isinstance(feature_value, float) else str(feature_value)
                                     else:
-                                        value_display = "N/A"
-                                except:
+                                        value_display = str(feature_value)
+                                elif original_values and feature_names[idx] in original_values:
+                                    value_display = str(original_values[feature_names[idx]])
+                                else:
                                     value_display = "N/A"
-                                
-                                explanations.append({
-                                    'feature': feature_names[idx],
-                                    'value': value_display,
-                                    'contribution': perc[idx],
-                                    'direction': direction,
-                                    'color': color,
-                                    'icon': icon,
-                                    'effect': effect
-                                })
-                                
-                                # Display each feature with clear percentage
-                                st.markdown(f"""
-                                <div class="explanation-box" style="border-left-color: {color};">
-                                    <b>{icon} {feature_names[idx]}</b><br>
-                                    → <b>Value:</b> {value_display}<br>
-                                    → <b>Contribution:</b> <span style="font-size: 16px; font-weight: bold; color: {color};">{perc[idx]:.1f}%</span> of the explanation<br>
-                                    → {direction}
-                                </div>
-                                """, unsafe_allow_html=True)
-                        
-                        # Add a summary section with percentages
-                        st.markdown("---")
-                        st.markdown("#### 📈 Contribution Summary")
-                        
-                        # Create a visual summary of contributions
-                        col1, col2, col3 = st.columns(3)
-                        
-                        total_positive = sum(e['contribution'] for e in explanations if e['effect'] == 'positive')
-                        total_negative = sum(e['contribution'] for e in explanations if e['effect'] == 'negative')
-                        total_neutral = sum(e['contribution'] for e in explanations if e['effect'] == 'neutral')
-                        
-                        with col1:
-                            st.metric("📈 Pushing HIGHER", f"{total_positive:.1f}%")
-                        with col2:
-                            st.metric("📉 Pushing LOWER", f"{total_negative:.1f}%")
-                        with col3:
-                            st.metric("⚖️ Minimal Impact", f"{total_neutral:.1f}%")
-                        
-                        # Add a detailed breakdown
-                        st.markdown("#### 🔍 Detailed Breakdown")
-                        
-                        # Create a dataframe for better visualization
-                        breakdown_data = []
-                        for exp in explanations[:5]:
-                            breakdown_data.append({
-                                "Feature": exp['feature'],
-                                "Value": exp['value'],
-                                "Contribution %": f"{exp['contribution']:.1f}%",
-                                "Direction": exp['direction']
-                            })
-                        
-                        if breakdown_data:
-                            breakdown_df = pd.DataFrame(breakdown_data)
-                            st.dataframe(breakdown_df, use_container_width=True, hide_index=True)
-                        
-                        # Add insight based on contributions
-                        st.markdown("#### 💡 Key Insight")
-                        
-                        # Find the most influential feature
-                        if explanations:
-                            top_feature = max(explanations, key=lambda x: x['contribution'])
-                            second_feature = sorted(explanations, key=lambda x: x['contribution'], reverse=True)[1] if len(explanations) > 1 else None
+                            except:
+                                value_display = "N/A"
                             
-                            if task == "Classification":
-                                insight_text = f"""
-                                The prediction of **{current_prediction}** is primarily influenced by:
-                                
-                                - **{top_feature['feature']}** contributed **{top_feature['contribution']:.1f}%** 
-                                """
-                                if second_feature:
-                                    insight_text += f"\n- **{second_feature['feature']}** contributed **{second_feature['contribution']:.1f}%**"
-                                
-                                if total_positive > total_negative + 20:
-                                    insight_text += f"\n\n✨ The prediction is strongly pushed HIGHER by {len([e for e in explanations if e['effect'] == 'positive'])} feature(s) accounting for {total_positive:.1f}% of the explanation."
-                                elif total_negative > total_positive + 20:
-                                    insight_text += f"\n\n📉 The prediction is strongly pushed LOWER by {len([e for e in explanations if e['effect'] == 'negative'])} feature(s) accounting for {total_negative:.1f}% of the explanation."
-                                else:
-                                    insight_text += f"\n\n⚖️ The prediction is balanced between {len([e for e in explanations if e['effect'] == 'positive'])} feature(s) pushing higher ({total_positive:.1f}%) and {len([e for e in explanations if e['effect'] == 'negative'])} feature(s) pushing lower ({total_negative:.1f}%)."
-                            else:
-                                insight_text = f"""
-                                The prediction of **{current_prediction:.2f}** is primarily influenced by:
-                                
-                                - **{top_feature['feature']}** contributed **{top_feature['contribution']:.1f}%** 
-                                """
-                                if second_feature:
-                                    insight_text += f"\n- **{second_feature['feature']}** contributed **{second_feature['contribution']:.1f}%**"
-                                
-                                if total_positive > total_negative + 20:
-                                    insight_text += f"\n\n✨ The prediction is strongly pushed HIGHER by {len([e for e in explanations if e['effect'] == 'positive'])} feature(s) accounting for {total_positive:.1f}% of the explanation."
-                                elif total_negative > total_positive + 20:
-                                    insight_text += f"\n\n📉 The prediction is strongly pushed LOWER by {len([e for e in explanations if e['effect'] == 'negative'])} feature(s) accounting for {total_negative:.1f}% of the explanation."
-                                else:
-                                    insight_text += f"\n\n⚖️ The prediction is balanced between {len([e for e in explanations if e['effect'] == 'positive'])} feature(s) pushing higher ({total_positive:.1f}%) and {len([e for e in explanations if e['effect'] == 'negative'])} feature(s) pushing lower ({total_negative:.1f}%)."
+                            st.markdown(f"""
+                            <div class="explanation-box" style="border-left-color: {color};">
+                                <b>{icon} {feature_names[idx]}</b><br>
+                                → <b>Value:</b> {value_display}<br>
+                                → <b>Contribution:</b> <span style="font-size: 15px; font-weight: bold;">{perc[idx]:.1f}%</span><br>
+                                → {direction}
+                            </div>
+                            """, unsafe_allow_html=True)
                             
-                            st.info(insight_text)
-                        
-                    except Exception as e:
-                        st.warning(f"Could not calculate SHAP values for this prediction: {str(e)[:100]}")
-                        # Fallback to showing feature values
-                        st.markdown("**Feature values for this prediction:**")
-                        for i, feat in enumerate(feature_names[:10]):
-                            if i < len(X_single.columns):
-                                value = X_single.iloc[0, i]
-                                st.text(f"{feat}: {value}")
-                else:
-                    # Fallback to showing feature values
-                    st.markdown("**Feature values for this prediction:**")
-                    for i, feat in enumerate(feature_names[:10]):
-                        if i < len(X_single.columns):
-                            value = X_single.iloc[0, i]
-                            st.text(f"{feat}: {value}")
-                
-                st.info("💡 **What this means:** The percentages show how much each feature contributed to the final prediction. Green features pushed the prediction higher, red features pushed it lower. The sum of all contributions equals 100%.")
+                except Exception as e:
+                    st.warning(f"Could not calculate detailed explanation: {str(e)[:100]}")
+            else:
+                st.warning("SHAP values not available for detailed explanation")
+            
+            st.info("💡 **What this means:** The percentages show how much each feature contributed to this specific prediction.")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
