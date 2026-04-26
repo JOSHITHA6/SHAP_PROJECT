@@ -56,7 +56,8 @@ def preprocess_data(df, target_column):
     
     # Split data (80/20)
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y if y.nunique() <= 10 else None
+        X, y, test_size=0.2, random_state=42, 
+        stratify=y if y.nunique() <= 10 else None
     )
     
     # Store original test data for display
@@ -66,16 +67,45 @@ def preprocess_data(df, target_column):
     X_train_processed = preprocessor.fit_transform(X_train)
     X_test_processed = preprocessor.transform(X_test)
     
-    # Get feature names after preprocessing
+    # Get feature names after preprocessing - FIXED VERSION
     feature_names = []
     
     # Add numeric feature names
     feature_names.extend(numeric_cols)
     
-    # Add categorical feature names
+    # Add categorical feature names correctly
     for cat_col in categorical_cols:
-        cats = preprocessor.named_transformers_['cat'].named_steps['onehot'].get_feature_names_out([cat_col])
-        feature_names.extend(cats)
+        try:
+            # FIX: Get the onehot encoder and call get_feature_names_out correctly
+            onehot_encoder = preprocessor.named_transformers_['cat'].named_steps['onehot']
+            
+            # For sklearn versions 1.0+
+            if hasattr(onehot_encoder, 'get_feature_names_out'):
+                # Get feature names for this column
+                cats = onehot_encoder.get_feature_names_out([cat_col])
+                feature_names.extend(cats)
+            else:
+                # Fallback for older sklearn versions
+                cats = [f"{cat_col}_{cat}" for cat in onehot_encoder.categories_[0]]
+                feature_names.extend(cats)
+        except Exception as e:
+            # Fallback: generate names manually
+            if hasattr(onehot_encoder, 'categories_'):
+                categories = onehot_encoder.categories_[0]
+                cats = [f"{cat_col}_{cat}" for cat in categories]
+                feature_names.extend(cats)
+            else:
+                # If all else fails, use indexed names
+                n_categories = len(preprocessor.transformers_[1][2])  # Get categorical columns count
+                feature_names.extend([f"{cat_col}_cat_{i}" for i in range(n_categories)])
+    
+    # Ensure feature_names length matches processed data
+    if len(feature_names) != X_train_processed.shape[1]:
+        print(f"Warning: feature_names length ({len(feature_names)}) doesn't match X_train_processed shape ({X_train_processed.shape[1]})")
+        print("Regenerating feature names...")
+        
+        # Regenerate with generic names
+        feature_names = [f"feature_{i}" for i in range(X_train_processed.shape[1])]
     
     # Convert to DataFrame for better handling
     X_train_processed = pd.DataFrame(X_train_processed, columns=feature_names)
