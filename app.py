@@ -95,6 +95,7 @@ st.markdown("""
         border-radius: 8px;
         font-weight: 500;
         transition: all 0.2s ease;
+        width: 100%;
     }
     .stButton > button:hover {
         background: #5a67d8;
@@ -102,9 +103,11 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
     }
     
-    /* Toggle button styling */
+    /* Radio button styling */
     .stRadio > div {
-        gap: 10px;
+        display: flex;
+        gap: 20px;
+        justify-content: center;
     }
     .stRadio label {
         background: #f0f2f6;
@@ -124,7 +127,7 @@ st.markdown("""
         border-left: 3px solid #667eea;
     }
     
-    /* Dataframe styling */
+    /* DataFrame styling */
     .dataframe {
         border-radius: 8px;
         overflow: hidden;
@@ -135,6 +138,11 @@ st.markdown("""
         margin: 30px 0 20px 0;
         padding-bottom: 10px;
         border-bottom: 2px solid #e0e0e0;
+    }
+    
+    /* Center align radio buttons */
+    div[data-testid="stHorizontalBlock"] {
+        justify-content: center;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -315,13 +323,14 @@ elif st.session_state.page == "explanation":
     st.markdown("*Understand why your model makes predictions*")
     st.markdown("---")
     
-    # Toggle for Global/Local Explanation
-    explanation_type = st.radio(
-        "Select Explanation Type",
-        ["🌍 Global Explanation", "🔍 Local Explanation"],
-        horizontal=True,
-        use_container_width=True
-    )
+    # Toggle for Global/Local Explanation (removed use_container_width)
+    col1, col2, col3 = st.columns([1, 3, 1])
+    with col2:
+        explanation_type = st.radio(
+            "Select Explanation Type",
+            ["🌍 Global Explanation", "🔍 Local Explanation"],
+            horizontal=True
+        )
     
     st.markdown("---")
     
@@ -427,13 +436,14 @@ elif st.session_state.page == "explanation":
         
         st.subheader("🔍 Explain a Single Prediction")
         
-        # Two options for local explanation
-        local_source = st.radio(
-            "Choose input method:",
-            ["📊 Use Test Data", "✏️ Enter New Data"],
-            horizontal=True,
-            use_container_width=True
-        )
+        # Two options for local explanation (removed use_container_width)
+        col1, col2, col3 = st.columns([1, 3, 1])
+        with col2:
+            local_source = st.radio(
+                "Choose input method:",
+                ["📊 Use Test Data", "✏️ Enter New Data"],
+                horizontal=True
+            )
         
         X_single = None
         original_values = None
