@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import time
+import shap
 
 from utils.preprocess import preprocess_data
 from BACKEND.model import train_model
@@ -14,12 +14,14 @@ st.set_page_config(layout="wide", page_title="SHAP AI Explainability Tool", page
 # Custom CSS for clean, minimal UI
 st.markdown("""
 <style>
+    /* Main container styling */
     .main-container {
         max-width: 1200px;
         margin: 0 auto;
         padding: 20px;
     }
     
+    /* Clean explanation box */
     .explanation-box {
         padding: 15px;
         margin-bottom: 12px;
@@ -35,6 +37,7 @@ st.markdown("""
         transform: translateX(3px);
     }
     
+    /* Light prediction card */
     .prediction-card-light {
         background: #f8f9fa;
         padding: 20px;
@@ -61,6 +64,7 @@ st.markdown("""
         color: #888;
     }
     
+    /* Metric card light */
     .metric-card-light {
         background: #ffffff;
         padding: 20px;
@@ -82,6 +86,7 @@ st.markdown("""
         color: #2c3e50;
     }
     
+    /* Button styling */
     .stButton > button {
         background: #667eea;
         color: white;
@@ -95,8 +100,10 @@ st.markdown("""
     .stButton > button:hover {
         background: #5a67d8;
         transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
     }
     
+    /* Radio button styling */
     .stRadio > div {
         display: flex;
         gap: 20px;
@@ -109,6 +116,7 @@ st.markdown("""
         font-weight: 500;
     }
     
+    /* Axis label styling */
     .axis-label {
         background: #f8f9fa;
         padding: 8px 15px;
@@ -119,6 +127,13 @@ st.markdown("""
         border-left: 3px solid #667eea;
     }
     
+    /* DataFrame styling */
+    .dataframe {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    /* Center align radio buttons */
     div[data-testid="stHorizontalBlock"] {
         justify-content: center;
     }
@@ -128,6 +143,9 @@ st.markdown("""
 # Initialize session state
 if "page" not in st.session_state:
     st.session_state.page = "input"
+    
+if "show_explanations" not in st.session_state:
+    st.session_state.show_explanations = False
     
 if "preprocessor" not in st.session_state:
     st.session_state.preprocessor = None
@@ -144,23 +162,28 @@ if st.session_state.page == "input":
     st.markdown("*Upload any dataset, train a model, and understand exactly WHY it makes predictions*")
     st.markdown("---")
     
+    # File upload
     file = st.file_uploader("📁 Upload CSV File", type=["csv"], help="Upload a CSV file with your data")
     
     if file:
         df = pd.read_csv(file)
         st.success(f"✅ File loaded successfully! {df.shape[0]} rows, {df.shape[1]} columns")
         
+        # Store original dataframe for later use
         st.session_state.original_df = df.copy()
         
+        # All inputs appear at once
         col1, col2, col3 = st.columns([1, 1, 1])
         
         with col1:
-            target = st.selectbox("🎯 Select Target Column", df.columns)
+            target = st.selectbox("🎯 Select Target Column", df.columns, 
+                                 help="The column you want to predict")
         
         with col2:
+            # Auto-detect task
             unique_count = df[target].nunique()
             task = "Classification" if unique_count <= 10 else "Regression"
-            st.info(f"📋 Detected Task: **{task}**\n\n({unique_count} unique values)")
+            st.info(f"📋 Detected Task: **{task}**\n\n({unique_count} unique values in target)")
         
         with col3:
             if task == "Classification":
@@ -168,22 +191,22 @@ if st.session_state.page == "input":
             else:
                 model_type = st.selectbox("🤖 Select Model", ["Random Forest", "Linear Regression"])
         
+        # Run button
         if st.button("🚀 Run Model", type="primary", use_container_width=True):
             
             with st.spinner("🔄 Processing data and training model..."):
-                start_time = time.time()
-                
+                # Preprocess data
                 (X_train, X_test, y_train, y_test, X_test_original, 
                  preprocessor, feature_names, original_columns, df_full) = preprocess_data(df, target)
                 
+                # Create display dataframe
                 test_display = X_test_original.copy()
                 test_display[target] = y_test.values
                 
+                # Train model
                 model = train_model(X_train, y_train, task, model_type)
                 
-                training_time = time.time() - start_time
-                st.success(f"✅ Model trained in {training_time:.2f} seconds!")
-                
+                # Store in session state
                 st.session_state.update({
                     "model": model,
                     "X_train": X_train,
@@ -210,30 +233,39 @@ elif st.session_state.page == "output":
     
     st.markdown('<div class="main-container">', unsafe_allow_html=True)
     
+    # Load session data
     model = st.session_state.model
     X_test = st.session_state.X_test
     y_test = st.session_state.y_test
     test_display = st.session_state.test_display
     task = st.session_state.task
+    target_name = st.session_state.target_name
     y_pred = st.session_state.y_pred
     
+    # Title
     st.title("📊 Model Results")
     st.markdown("---")
     
+    # Center aligned content
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
         
+        # Add Back to Input button at the top
         if st.button("⬅️ Back to Input", use_container_width=True, key="back_to_input_btn"):
             st.session_state.page = "input"
+            st.session_state.show_explanations = False
             st.rerun()
         
         st.markdown("---")
         
+        # 1. Test Dataset
         st.subheader("📄 Test Dataset")
         st.dataframe(test_display, height=300, use_container_width=True)
         
         st.markdown("---")
+        
+        # 2. Model Performance
         st.subheader("📈 Model Performance")
         
         if task == "Classification":
@@ -255,9 +287,11 @@ elif st.session_state.page == "output":
             </div>
             """, unsafe_allow_html=True)
         
+        # 3. View Explanations Button
         st.markdown("---")
         
         if st.button("🔍 View Explanations?", type="primary", use_container_width=True):
+            st.session_state.show_explanations = True
             st.session_state.page = "explanation"
             st.rerun()
     
@@ -268,16 +302,20 @@ elif st.session_state.page == "explanation":
     
     st.markdown('<div class="main-container">', unsafe_allow_html=True)
     
+    # Load session data
     model = st.session_state.model
     X_test = st.session_state.X_test
     y_test = st.session_state.y_test
     test_display = st.session_state.test_display
     feature_names = st.session_state.feature_names
     task = st.session_state.task
+    target_name = st.session_state.target_name
     preprocessor = st.session_state.preprocessor
     original_columns = st.session_state.original_columns
+    X_test_original = st.session_state.X_test_original
     y_pred = st.session_state.y_pred
     
+    # Back button to results
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("⬅️ Back to Results", use_container_width=True):
@@ -285,8 +323,10 @@ elif st.session_state.page == "explanation":
             st.rerun()
     
     st.title("📖 Model Explainability")
+    st.markdown("*Understand why your model makes predictions*")
     st.markdown("---")
     
+    # Toggle for Global/Local Explanation
     col1, col2, col3 = st.columns([1, 3, 1])
     with col2:
         explanation_type = st.radio(
@@ -302,91 +342,108 @@ elif st.session_state.page == "explanation":
         
         st.subheader("🌍 How Features Impact Predictions")
         
-        # Use model feature importance instead of SHAP
-        if hasattr(model, 'feature_importances_'):
-            importances = model.feature_importances_
-            
-            # Create bar chart
-            fig, ax = plt.subplots(figsize=(10, 6))
-            indices = np.argsort(importances)[::-1][:10]
-            colors = ['#28a745' if i < len(indices)//2 else '#dc3545' for i in range(len(indices))]
-            ax.barh(range(len(indices)), importances[indices], color=colors)
-            ax.set_yticks(range(len(indices)))
-            ax.set_yticklabels([feature_names[i] for i in indices])
-            ax.set_xlabel("Feature Importance")
-            ax.set_title("Top 10 Feature Importances")
-            ax.invert_yaxis()
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
-            
-            st.markdown('<div class="axis-label">📊 X-axis = Feature Importance Score</div>', unsafe_allow_html=True)
-            st.markdown('<div class="axis-label">📈 Y-axis = Features</div>', unsafe_allow_html=True)
-            
-            st.markdown("---")
-            st.markdown("### 🎯 Overall Model Prediction")
-            
-            if task == "Classification":
-                from collections import Counter
-                majority_pred = Counter(y_pred).most_common(1)[0][0]
-                st.markdown(f"""
-                <div class="prediction-card-light">
-                    <h3>The model generally predicts:</h3>
-                    <h1>{majority_pred}</h1>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                avg_pred = np.mean(y_pred)
-                st.markdown(f"""
-                <div class="prediction-card-light">
-                    <h3>Average predicted value:</h3>
-                    <h1>{avg_pred:.3f}</h1>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            st.markdown("---")
-            st.markdown("### 🧠 Why This Behavior?")
-            st.markdown("*Here's what the model learned from your data:*")
-            
-            # Show top 5 features with percentages
-            total_importance = importances.sum()
-            perc = (importances / total_importance) * 100
-            top_indices = np.argsort(importances)[::-1][:5]
-            
-            for idx in top_indices:
-                idx = int(idx)
-                importance_perc = perc[idx]
-                
-                if importance_perc > 10:
-                    direction = "strongly influences predictions"
-                    color = "#28a745"
-                    icon = "📈"
-                elif importance_perc > 5:
-                    direction = "moderately influences predictions"
-                    color = "#17a2b8"
-                    icon = "📊"
+        # Generate SHAP plots
+        with st.spinner("Calculating feature impacts..."):
+            try:
+                if 'RandomForest' in str(type(model)):
+                    # Use a small sample for faster computation
+                    X_sample = X_test[:min(100, len(X_test))]
+                    
+                    # Create explainer
+                    explainer = shap.TreeExplainer(model)
+                    shap_values = explainer.shap_values(X_sample)
+                    
+                    # Handle classification output
+                    if isinstance(shap_values, list):
+                        if task == "Classification" and len(shap_values) == 2:
+                            shap_values = shap_values[1]  # Take positive class
+                        else:
+                            shap_values = shap_values[0]
+                    
+                    # Create summary plot
+                    plt.figure(figsize=(10, 6))
+                    shap.summary_plot(shap_values, X_sample, plot_type="violin", show=False, max_display=min(10, len(feature_names)))
+                    plt.tight_layout()
+                    fig_global = plt.gcf()
+                    plt.close()
+                    
+                    st.pyplot(fig_global, use_container_width=True)
+                    st.markdown('<div class="axis-label">📊 X-axis = Feature Impact on Model Output</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="axis-label">📈 Y-axis = Features</div>', unsafe_allow_html=True)
+                    
+                    # Calculate feature importance
+                    vals = np.abs(shap_values).mean(axis=0)
+                    if vals.sum() > 0:
+                        perc = (vals / vals.sum()) * 100
+                    else:
+                        perc = np.zeros_like(vals)
+                    
+                    top_indices = np.argsort(vals)[::-1][:5]
+                    
+                    st.markdown("---")
+                    st.markdown("### 🎯 Overall Model Prediction")
+                    
+                    if task == "Classification":
+                        from collections import Counter
+                        majority_pred = Counter(y_pred).most_common(1)[0][0]
+                        st.markdown(f"""
+                        <div class="prediction-card-light">
+                            <h3>The model generally predicts:</h3>
+                            <h1>{majority_pred}</h1>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        avg_pred = np.mean(y_pred)
+                        st.markdown(f"""
+                        <div class="prediction-card-light">
+                            <h3>Average predicted value:</h3>
+                            <h1>{avg_pred:.3f}</h1>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    st.markdown("---")
+                    st.markdown("### 🧠 Why This Behavior?")
+                    st.markdown("*Here's what the model learned from your data:*")
+                    
+                    for idx in top_indices:
+                        idx = int(idx)
+                        if idx < len(feature_names):
+                            mean_shap = np.mean(shap_values[:, idx])
+                            
+                            if mean_shap > 0:
+                                direction = "pushes prediction HIGHER"
+                                color = "#28a745"
+                                icon = "📈"
+                            elif mean_shap < 0:
+                                direction = "pushes prediction LOWER"
+                                color = "#dc3545"
+                                icon = "📉"
+                            else:
+                                direction = "has mixed or minimal impact"
+                                color = "#6c757d"
+                                icon = "⚖️"
+                            
+                            st.markdown(f"""
+                            <div class="explanation-box" style="border-left-color: {color};">
+                                <b>{icon} {feature_names[idx]}</b><br>
+                                → <b>Contribution: {perc[idx]:.1f}%</b> of total impact<br>
+                                → {direction}
+                            </div>
+                            """, unsafe_allow_html=True)
                 else:
-                    direction = "has some influence on predictions"
-                    color = "#6c757d"
-                    icon = "⚖️"
-                
-                st.markdown(f"""
-                <div class="explanation-box" style="border-left-color: {color};">
-                    <b>{icon} {feature_names[idx]}</b><br>
-                    → <b>Importance: {importance_perc:.1f}%</b> of total importance<br>
-                    → This feature {direction}
-                </div>
-                """, unsafe_allow_html=True)
-            
-            st.info("💡 **How to read this:** Features with higher percentages have more influence on model predictions.")
-        else:
-            st.warning("Feature importance not available for this model type. Please use Random Forest for better insights.")
+                    st.warning("Global SHAP plot only available for Random Forest models")
+                    
+            except Exception as e:
+                st.warning(f"Could not generate SHAP plot: {str(e)[:100]}")
+        
+        st.info("💡 **How to read this:** Features with higher percentages have more influence on predictions.")
     
     # ========== LOCAL EXPLANATION ==========
     else:
         
         st.subheader("🔍 Explain a Single Prediction")
         
+        # Two options for local explanation
         col1, col2, col3 = st.columns([1, 3, 1])
         with col2:
             local_source = st.radio(
@@ -516,74 +573,105 @@ elif st.session_state.page == "explanation":
                     </div>
                     """, unsafe_allow_html=True)
             
-            # Feature Contributions
+            # Generate Feature Contributions
             st.markdown("### 📊 Feature Contributions")
             
-            if hasattr(model, 'feature_importances_'):
-                # Use model feature importances for local explanation
-                importances = model.feature_importances_
-                
-                # For local prediction, we can show the feature values and their global importance
-                plt.figure(figsize=(10, 6))
-                top_n = min(10, len(feature_names))
-                top_idx = np.argsort(importances)[-top_n:]
-                colors = ['#28a745' for _ in range(len(top_idx))]
-                plt.barh(range(len(top_idx)), importances[top_idx], color=colors)
-                plt.yticks(range(len(top_idx)), [feature_names[i] for i in top_idx])
-                plt.xlabel("Feature Importance")
-                plt.title("Important Features for Model Predictions")
-                plt.tight_layout()
-                st.pyplot(plt.gcf())
-                plt.close()
-                
-                st.markdown('<div class="axis-label">📊 X-axis = Feature Importance</div>', unsafe_allow_html=True)
-                st.markdown('<div class="axis-label">📈 Y-axis = Features</div>', unsafe_allow_html=True)
-                
-                st.markdown("---")
-                st.markdown("### 🧠 Why This Prediction?")
-                st.markdown("*Here are the most important features for this model:*")
-                
-                total_importance = importances.sum()
-                perc = (importances / total_importance) * 100
-                top_indices = np.argsort(importances)[::-1][:5]
-                
-                for idx in top_indices:
-                    idx = int(idx)
-                    importance_perc = perc[idx]
+            try:
+                if 'RandomForest' in str(type(model)):
+                    # Use TreeExplainer which is faster
+                    explainer = shap.TreeExplainer(model)
+                    shap_values = explainer.shap_values(X_single)
                     
-                    # Get feature value if available
-                    feature_value = "N/A"
-                    if idx < len(X_single.columns):
-                        val = X_single.iloc[0, idx]
-                        if isinstance(val, (int, float)):
-                            feature_value = f"{val:.2f}" if isinstance(val, float) else str(val)
+                    # Handle the output shape correctly
+                    if isinstance(shap_values, list):
+                        # For classification
+                        if len(shap_values) == 2:
+                            # Binary classification - take positive class
+                            shap_row = shap_values[1].flatten()
                         else:
-                            feature_value = str(val)
-                    
-                    if importance_perc > 10:
-                        direction = "major driver of predictions"
-                        color = "#28a745"
-                        icon = "📈"
-                    elif importance_perc > 5:
-                        direction = "moderate driver of predictions"
-                        color = "#17a2b8"
-                        icon = "📊"
+                            # Multi-class - take first class
+                            shap_row = shap_values[0].flatten()
                     else:
-                        direction = "contributes to predictions"
-                        color = "#6c757d"
-                        icon = "⚖️"
+                        # For regression
+                        shap_row = shap_values.flatten()
                     
-                    st.markdown(f"""
-                    <div class="explanation-box" style="border-left-color: {color};">
-                        <b>{icon} {feature_names[idx]}</b><br>
-                        → <b>Value:</b> {feature_value}<br>
-                        → <b>Importance: {importance_perc:.1f}%</b><br>
-                        → This feature is a {direction}
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                st.info("💡 **How to read this:** Features with higher importance percentages have more influence on model predictions.")
-            else:
-                st.warning("Feature importance not available. Please use Random Forest model for feature explanations.")
+                    # Ensure we have the right length
+                    if len(shap_row) != len(feature_names):
+                        st.warning(f"SHAP values length ({len(shap_row)}) doesn't match features ({len(feature_names)}). Truncating to minimum.")
+                        min_len = min(len(shap_row), len(feature_names))
+                        shap_row = shap_row[:min_len]
+                        display_features = feature_names[:min_len]
+                    else:
+                        display_features = feature_names
+                    
+                    # Create bar plot
+                    plt.figure(figsize=(10, 6))
+                    top_n = min(10, len(display_features))
+                    top_idx = np.argsort(np.abs(shap_row))[-top_n:]
+                    colors = ['#dc3545' if x < 0 else '#28a745' for x in shap_row[top_idx]]
+                    plt.barh(range(len(top_idx)), shap_row[top_idx], color=colors)
+                    plt.yticks(range(len(top_idx)), [display_features[i] for i in top_idx])
+                    plt.xlabel("SHAP Value (Impact on Prediction)")
+                    plt.title("Feature Contributions for This Prediction")
+                    plt.axvline(x=0, color='black', linestyle='-', linewidth=0.5)
+                    plt.tight_layout()
+                    fig_local = plt.gcf()
+                    st.pyplot(fig_local, use_container_width=True)
+                    plt.close()
+                    
+                    # Axis labels
+                    st.markdown('<div class="axis-label">📊 X-axis = Impact on Prediction</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="axis-label">📈 Y-axis = Features</div>', unsafe_allow_html=True)
+                    
+                    # Calculate percentages
+                    abs_vals = np.abs(shap_row)
+                    if abs_vals.sum() > 0:
+                        percentages = (abs_vals / abs_vals.sum()) * 100
+                    else:
+                        percentages = np.zeros_like(shap_row)
+                    
+                    # Get top 5 features by absolute impact
+                    top_indices = np.argsort(abs_vals)[::-1][:5]
+                    
+                    st.markdown("---")
+                    st.markdown("### 🧠 Why This Prediction?")
+                    st.markdown("*Here's why the model made this specific prediction:*")
+                    
+                    for idx in top_indices:
+                        if idx < len(display_features):
+                            feat_name = display_features[idx]
+                            contribution = percentages[idx]
+                            shap_value = shap_row[idx]
+                            
+                            if shap_value > 0:
+                                direction = "pushes prediction HIGHER"
+                                color = "#28a745"
+                                icon = "📈"
+                            elif shap_value < 0:
+                                direction = "pushes prediction LOWER"
+                                color = "#dc3545"
+                                icon = "📉"
+                            else:
+                                direction = "has minimal impact"
+                                color = "#6c757d"
+                                icon = "⚖️"
+                            
+                            st.markdown(f"""
+                            <div class="explanation-box" style="border-left-color: {color};">
+                                <b>{icon} {feat_name}</b><br>
+                                → <b>Contribution: {contribution:.1f}%</b> of total impact<br>
+                                → {direction}
+                            </div>
+                            """, unsafe_allow_html=True)
+                    
+                    st.info("💡 **How to read this:** Features with higher percentages have more influence on this prediction. Green bars push the prediction higher, red bars push it lower.")
+                    
+                else:
+                    st.warning("⚠️ For the best explainability experience, please use Random Forest model.")
+                    st.info("Current model type: " + str(type(model)).split('.')[-1].split("'")[0])
+                    
+            except Exception as e:
+                st.error(f"Error generating explanation: {str(e)}")
+                st.info("Please make sure you're using Random Forest model for SHAP explanations.")
     
     st.markdown('</div>', unsafe_allow_html=True)
