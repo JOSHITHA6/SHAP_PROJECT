@@ -108,4 +108,41 @@ def generate_shap_plots(model, X_sample, X_single=None, feature_names=None, task
             if 'TreeExplainer' in str(explainer):
                 shap_single = explainer.shap_values(X_single)
                 if isinstance(shap_single, list):
-                    shap_single = shap_single[1] if len(shap_single)
+                    shap_single = shap_single[1] if len(shap_single) > 1 else shap_single[0]
+            else:
+                shap_single = explainer.shap_values(X_single)
+                if isinstance(shap_single, list):
+                    shap_single = shap_single[1] if len(shap_single) > 1 else shap_single[0]
+            
+            if len(shap_single.shape) == 3:
+                shap_single = shap_single[:, :, 0]
+            
+            plt.figure(figsize=(10, 6), facecolor='white')
+            
+            if hasattr(explainer, 'expected_value'):
+                expected_value = explainer.expected_value
+                if isinstance(expected_value, (list, np.ndarray)):
+                    expected_value = expected_value[1] if len(expected_value) > 1 else expected_value[0]
+            else:
+                expected_value = 0
+            
+            shap.waterfall_plot(
+                shap.Explanation(
+                    values=shap_single[0] if len(shap_single.shape) > 1 else shap_single,
+                    base_values=expected_value,
+                    data=X_single.iloc[0].values,
+                    feature_names=X_single.columns.tolist()
+                ),
+                show=False,
+                max_display=10
+            )
+            
+            plt.tight_layout()
+            fig_local = plt.gcf()
+            plt.close()
+            
+        except Exception as e:
+            print(f"Waterfall plot failed: {str(e)[:50]}")
+            fig_local = None
+    
+    return fig_global, fig_local, shap_values
