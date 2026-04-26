@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import shap
+import time
 
 from utils.preprocess import preprocess_data
 from BACKEND.model import train_model
@@ -195,6 +196,8 @@ if st.session_state.page == "input":
         if st.button("🚀 Run Model", type="primary", use_container_width=True):
             
             with st.spinner("🔄 Processing data and training model..."):
+                start_time = time.time()
+                
                 # Preprocess data
                 (X_train, X_test, y_train, y_test, X_test_original, 
                  preprocessor, feature_names, original_columns, df_full) = preprocess_data(df, target)
@@ -205,6 +208,9 @@ if st.session_state.page == "input":
                 
                 # Train model
                 model = train_model(X_train, y_train, task, model_type)
+                
+                training_time = time.time() - start_time
+                st.success(f"✅ Model trained in {training_time:.2f} seconds!")
                 
                 # Store in session state
                 st.session_state.update({
@@ -578,26 +584,21 @@ elif st.session_state.page == "explanation":
             
             try:
                 if 'RandomForest' in str(type(model)):
-                    # Use TreeExplainer which is faster
+                    # Use TreeExplainer for faster computation
                     explainer = shap.TreeExplainer(model)
                     shap_values = explainer.shap_values(X_single)
                     
                     # Handle the output shape correctly
                     if isinstance(shap_values, list):
-                        # For classification
                         if len(shap_values) == 2:
-                            # Binary classification - take positive class
                             shap_row = shap_values[1].flatten()
                         else:
-                            # Multi-class - take first class
                             shap_row = shap_values[0].flatten()
                     else:
-                        # For regression
                         shap_row = shap_values.flatten()
                     
                     # Ensure we have the right length
                     if len(shap_row) != len(feature_names):
-                        st.warning(f"SHAP values length ({len(shap_row)}) doesn't match features ({len(feature_names)}). Truncating to minimum.")
                         min_len = min(len(shap_row), len(feature_names))
                         shap_row = shap_row[:min_len]
                         display_features = feature_names[:min_len]
@@ -630,7 +631,6 @@ elif st.session_state.page == "explanation":
                     else:
                         percentages = np.zeros_like(shap_row)
                     
-                    # Get top 5 features by absolute impact
                     top_indices = np.argsort(abs_vals)[::-1][:5]
                     
                     st.markdown("---")
@@ -668,7 +668,6 @@ elif st.session_state.page == "explanation":
                     
                 else:
                     st.warning("⚠️ For the best explainability experience, please use Random Forest model.")
-                    st.info("Current model type: " + str(type(model)).split('.')[-1].split("'")[0])
                     
             except Exception as e:
                 st.error(f"Error generating explanation: {str(e)}")

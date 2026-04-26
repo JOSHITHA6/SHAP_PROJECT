@@ -9,18 +9,6 @@ from sklearn.impute import SimpleImputer
 def preprocess_data(df, target_column):
     """
     Preprocess data for machine learning
-    
-    Parameters:
-    - df: Input dataframe
-    - target_column: Name of target column
-    
-    Returns:
-    - X_train, X_test, y_train, y_test: Split data
-    - X_test_original: Original test features (for display)
-    - preprocessor: Fitted preprocessor
-    - feature_names: Names of features after preprocessing
-    - original_columns: Original column names
-    - df_full: Full dataframe
     """
     
     # Separate features and target
@@ -34,31 +22,40 @@ def preprocess_data(df, target_column):
     numeric_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
     categorical_cols = X.select_dtypes(include=['object', 'category']).columns.tolist()
     
+    # If no categorical columns, create empty list
+    if not categorical_cols:
+        categorical_cols = []
+    
     # Create preprocessing pipelines
     numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='median')),
         ('scaler', StandardScaler())
     ])
     
-    categorical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-        ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
-    ])
+    # Only create categorical transformer if there are categorical columns
+    transformers = [('num', numeric_transformer, numeric_cols)]
+    
+    if categorical_cols:
+        categorical_transformer = Pipeline(steps=[
+            ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
+            ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
+        ])
+        transformers.append(('cat', categorical_transformer, categorical_cols))
     
     # Combine preprocessors
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', numeric_transformer, numeric_cols),
-            ('cat', categorical_transformer, categorical_cols)
-        ],
-        remainder='drop'
-    )
+    preprocessor = ColumnTransformer(transformers=transformers, remainder='drop')
     
     # Split data (80/20)
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, 
-        stratify=y if y.nunique() <= 10 else None
-    )
+    try:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42,
+            stratify=y if y.nunique() <= 10 else None
+        )
+    except:
+        # If stratification fails due to too many categories
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
     
     # Store original test data for display
     X_test_original = X_test.copy()
@@ -67,43 +64,36 @@ def preprocess_data(df, target_column):
     X_train_processed = preprocessor.fit_transform(X_train)
     X_test_processed = preprocessor.transform(X_test)
     
-    # Get feature names after preprocessing - FIXED VERSION
+    # Generate feature names - SIMPLE AND RELIABLE APPROACH
     feature_names = []
     
     # Add numeric feature names
     feature_names.extend(numeric_cols)
     
-    # Add categorical feature names correctly
-    for cat_col in categorical_cols:
+    # Add categorical feature names if they exist
+    if categorical_cols:
         try:
-            # FIX: Get the onehot encoder and call get_feature_names_out correctly
-            onehot_encoder = preprocessor.named_transformers_['cat'].named_steps['onehot']
+            # Get the onehot encoder
+            ohe = preprocessor.named_transformers_['cat'].named_steps['onehot']
+            # Get feature names
+            cat_feature_names = ohe.get_feature_names_out(categorical_cols)
+            feature_names.extend(list(cat_feature_names))
+        except:
+            # If that fails, create generic names
+            for cat_col in categorical_cols:
+                # Get unique values from the original data (limit to 10)
+                unique_vals = X[cat_col].dropna().unique()[:10]
+                for val in unique_vals:
+                    feature_names.append(f"{cat_col}_{val}")
             
-            # For sklearn versions 1.0+
-            if hasattr(onehot_encoder, 'get_feature_names_out'):
-                # Get feature names for this column
-                cats = onehot_encoder.get_feature_names_out([cat_col])
-                feature_names.extend(cats)
-            else:
-                # Fallback for older sklearn versions
-                cats = [f"{cat_col}_{cat}" for cat in onehot_encoder.categories_[0]]
-                feature_names.extend(cats)
-        except Exception as e:
-            # Fallback: generate names manually
-            if hasattr(onehot_encoder, 'categories_'):
-                categories = onehot_encoder.categories_[0]
-                cats = [f"{cat_col}_{cat}" for cat in categories]
-                feature_names.extend(cats)
-            else:
-                # If all else fails, use indexed names
-                n_categories = len(preprocessor.transformers_[1][2])  # Get categorical columns count
-                feature_names.extend([f"{cat_col}_cat_{i}" for i in range(n_categories)])
+            # If still no features, create generic names
+            if len(feature_names) == len(numeric_cols):
+                n_cat_features = X_train_processed.shape[1] - len(numeric_cols)
+                for i in range(n_cat_features):
+                    feature_names.append(f"cat_feature_{i}")
     
-    # Ensure feature_names length matches processed data
+    # Final safety check - ensure feature_names length matches
     if len(feature_names) != X_train_processed.shape[1]:
-        print(f"Warning: feature_names length ({len(feature_names)}) doesn't match X_train_processed shape ({X_train_processed.shape[1]})")
-        print("Regenerating feature names...")
-        
         # Regenerate with generic names
         feature_names = [f"feature_{i}" for i in range(X_train_processed.shape[1])]
     
