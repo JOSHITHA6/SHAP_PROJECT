@@ -351,7 +351,7 @@ elif st.session_state.page == "explanation":
     st.markdown("*Understand why your model makes predictions*")
     st.markdown("---")
     
-    # Toggle for Global/Local Explanation (removed use_container_width)
+    # Toggle for Global/Local Explanation
     col1, col2, col3 = st.columns([1, 3, 1])
     with col2:
         explanation_type = st.radio(
@@ -464,7 +464,7 @@ elif st.session_state.page == "explanation":
         
         st.subheader("🔍 Explain a Single Prediction")
         
-        # Two options for local explanation (removed use_container_width)
+        # Two options for local explanation
         col1, col2, col3 = st.columns([1, 3, 1])
         with col2:
             local_source = st.radio(
@@ -477,7 +477,7 @@ elif st.session_state.page == "explanation":
         original_values = None
         current_prediction = None
         current_actual = None
-        shap_values_array = None  # Initialize here
+        shap_values_array = None
         
         if local_source == "📊 Use Test Data":
             # Option 1: Select existing row
@@ -629,7 +629,7 @@ elif st.session_state.page == "explanation":
             
             st.markdown("---")
             
-            # ========== Why This Prediction? WITH FEATURE CONTRIBUTIONS ==========
+            # ========== UPDATED: Why This Prediction? (Matching Global Pattern) ==========
             st.markdown("### 🧠 Why This Prediction?")
             st.markdown("*Here's why the model made this specific prediction:*")
             
@@ -645,7 +645,7 @@ elif st.session_state.page == "explanation":
                     else:
                         shap_row = shap_values_array.flatten()
                     
-                    # Calculate percentages
+                    # Calculate percentages for this row
                     vals = np.abs(shap_row)
                     if vals.sum() > 0:
                         perc = (vals / vals.sum()) * 100
@@ -655,13 +655,13 @@ elif st.session_state.page == "explanation":
                     # Sort by absolute impact
                     sorted_indices = np.argsort(np.abs(shap_row))[::-1][:5]
                     
-                    # Display each feature with its contribution percentage
+                    # Display each feature exactly like global explanation
                     for idx in sorted_indices:
                         idx = int(idx)
                         if idx < len(feature_names):
                             shap_val = shap_row[idx]
                             
-                            # Determine direction
+                            # Determine direction (matching global pattern)
                             if shap_val > 0.05:
                                 direction = "pushes prediction HIGHER"
                                 color = "#28a745"
@@ -671,48 +671,18 @@ elif st.session_state.page == "explanation":
                                 color = "#dc3545"
                                 icon = "📉"
                             else:
-                                direction = "has minimal impact on this prediction"
+                                direction = "has mixed or minimal impact"
                                 color = "#6c757d"
                                 icon = "⚖️"
                             
-                            # Get the actual value of this feature
-                            try:
-                                if idx < len(X_single.columns):
-                                    feature_value = X_single.iloc[0, idx]
-                                    if isinstance(feature_value, (int, float)):
-                                        value_display = f"{feature_value:.3f}" if isinstance(feature_value, float) else str(feature_value)
-                                    else:
-                                        value_display = str(feature_value)
-                                elif original_values and feature_names[idx] in original_values:
-                                    value_display = str(original_values[feature_names[idx]])
-                                else:
-                                    value_display = "N/A"
-                            except:
-                                value_display = "N/A"
-                            
-                            # Display the feature contribution box with percentage prominently shown
+                            # Display exactly like global format (without the value line)
                             st.markdown(f"""
                             <div class="explanation-box" style="border-left-color: {color};">
                                 <b>{icon} {feature_names[idx]}</b><br>
-                                → <b>Value:</b> {value_display}<br>
-                                → <b>Contribution:</b> <span style="font-size: 16px; font-weight: bold; color: {color};">{perc[idx]:.1f}%</span><br>
+                                → <b>Contribution: {perc[idx]:.1f}%</b> of total impact<br>
                                 → {direction}
                             </div>
                             """, unsafe_allow_html=True)
-                    
-                    # Add a summary of contributions
-                    st.markdown("---")
-                    st.markdown("#### 📊 Contribution Summary")
-                    
-                    # Calculate total positive and negative contributions
-                    positive_sum = sum(perc[idx] for idx in sorted_indices if idx < len(feature_names) and shap_row[idx] > 0.05)
-                    negative_sum = sum(perc[idx] for idx in sorted_indices if idx < len(feature_names) and shap_row[idx] < -0.05)
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("📈 Pushing HIGHER", f"{positive_sum:.1f}%")
-                    with col2:
-                        st.metric("📉 Pushing LOWER", f"{negative_sum:.1f}%")
                     
                 except Exception as e:
                     st.warning(f"Could not calculate detailed explanation: {str(e)[:100]}")
@@ -731,6 +701,6 @@ elif st.session_state.page == "explanation":
                         value = X_single.iloc[0, i]
                         st.text(f"{feat}: {value}")
             
-            st.info("💡 **What this means:** The percentages show how much each feature contributed to this specific prediction. Green features pushed the prediction higher, red features pushed it lower.")
+            st.info("💡 **How to read this:** Features with higher percentages have more influence on this prediction.")
     
     st.markdown('</div>', unsafe_allow_html=True)
