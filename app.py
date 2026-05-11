@@ -118,35 +118,47 @@ def get_shap_explainer(model, X_background):
 
 def compute_shap_values(explainer, X, task, model):
     """
-    Compute SHAP values and return a 2-D array (n_samples × n_features).
-    For multi-class classification we take the class with the highest
-    mean absolute SHAP across all samples (or class index 1 for binary).
+    Compute SHAP values and always return a clean 2-D array (n_samples x n_features).
+
+    Handles three formats that different shap versions return:
+      - list of arrays  -> old TreeExplainer style
+      - 3-D array (n_samples, n_features, n_classes) -> newer shap style
+      - 2-D array (n_samples, n_features) -> regression / linear models
     """
     raw = explainer.shap_values(X)
+    arr = np.array(raw)
 
-    # TreeExplainer returns a list for classifiers
+    # Case 1: list of 2-D arrays, one per class -> (n_classes, n_samples, n_features)
     if isinstance(raw, list):
-        if len(raw) == 2:
-            # Binary classification → use class-1 shap values
-            return np.array(raw[1])
+        arr = np.stack(raw, axis=0)
+        if arr.shape[0] == 2:
+            return arr[1]                      # binary -> class-1
         else:
-            # Multi-class → stack and take mean-abs across classes
-            stacked = np.stack(raw, axis=0)          # (n_classes, n_samples, n_features)
-            abs_mean = np.abs(stacked).mean(axis=1)  # (n_classes, n_features)
-            best_class = int(np.argmax(abs_mean.sum(axis=1)))
-            return np.array(raw[best_class])
+            best = int(np.argmax(np.abs(arr).mean(axis=(1, 2))))
+            return arr[best]
 
-    return np.array(raw)
+    # Case 2: 3-D array (n_samples, n_features, n_classes) -> newer shap
+    if arr.ndim == 3:
+        if arr.shape[2] == 2:
+            return arr[:, :, 1]               # binary -> class-1
+        else:
+            best = int(np.argmax(np.abs(arr).mean(axis=(0, 1))))
+            return arr[:, :, best]
+
+    # Case 3: already 2-D (n_samples, n_features) -> regression
+    return arr
 
 
 def global_shap_summary(shap_vals, feature_names, top_n=10):
     """
-    Mean |SHAP| per feature  →  (indices sorted desc, mean_abs_shap, mean_signed_shap).
-    mean_signed_shap tells us the average direction (+/-).
+    Mean |SHAP| per feature -> (indices sorted desc, mean_abs_shap, mean_signed_shap).
     """
+    shap_vals = np.array(shap_vals)
+    if shap_vals.ndim != 2:
+        shap_vals = shap_vals.reshape(shap_vals.shape[0], -1)
     mean_abs  = np.abs(shap_vals).mean(axis=0)
     mean_sign = shap_vals.mean(axis=0)
-    top_idx   = [int(i) for i in np.argsort(mean_abs)[::-1][:top_n]]
+    top_idx   = np.argsort(mean_abs)[::-1][:top_n].tolist()
     return top_idx, mean_abs, mean_sign
 
 
@@ -439,8 +451,9 @@ elif st.session_state.page == "explanation":
             st.markdown("### 📊 Feature Contributions for This Prediction")
 
             top_n      = min(8, len(feature_names))
+            local_shap = np.array(local_shap).flatten()          # ensure 1-D
             abs_local  = np.abs(local_shap)
-            top_idx_l  = [int(i) for i in np.argsort(abs_local)[-top_n:]]   # plain Python ints
+            top_idx_l  = np.argsort(abs_local)[-top_n:].tolist() # plain Python ints
             top_feats_l   = [feature_names[i] for i in top_idx_l]
             top_shap_l    = np.array([local_shap[i] for i in top_idx_l])
             colors_l      = ['#28a745' if v >= 0 else '#dc3545' for v in top_shap_l]
