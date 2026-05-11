@@ -177,11 +177,18 @@ if st.session_state.page == "input":
     st.markdown("*Upload any dataset, train a model, and understand WHY it makes predictions*")
     st.markdown("---")
 
-    file = st.file_uploader("📁 Upload CSV File", type=["csv"])
+    file = st.file_uploader("📁 Upload CSV File (Max: 25 MB)", type=["csv"])
 
     if file:
+        # ── File size check (safe limit = 25 MB)
+        file_size_mb = file.size / (1024 * 1024)
+        if file_size_mb > 25:
+            st.error(f"❌ File too large: {file_size_mb:.1f} MB. Please upload a CSV file under 25 MB. "
+                     f"Large files slow down SHAP computation significantly and may crash the app.")
+            st.stop()
+
         df = pd.read_csv(file)
-        st.success(f"✅ Loaded: {df.shape[0]} rows, {df.shape[1]} columns")
+        st.success(f"✅ Loaded: {df.shape[0]} rows, {df.shape[1]} columns | File size: {file_size_mb:.1f} MB")
         st.session_state.original_df = df.copy()
 
         col1, col2, col3 = st.columns(3)
