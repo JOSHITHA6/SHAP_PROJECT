@@ -1,75 +1,42 @@
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.model_selection import GridSearchCV
-import warnings
-warnings.filterwarnings('ignore')
+from sklearn.svm import SVC, SVR
 
-def train_model(X_train, y_train, task, model_type):
+
+def train_model(X_train, y_train, task: str, model_type: str):
     """
-    Train a model with hyperparameter tuning
-    
-    Parameters:
-    - X_train: Training features
-    - y_train: Training target
-    - task: 'Classification' or 'Regression'
-    - model_type: Type of model to train
-    
-    Returns:
-    - Trained model
+    Train and return a fitted model.
+
+    Parameters
+    ----------
+    X_train    : array-like of shape (n_samples, n_features)
+    y_train    : array-like of shape (n_samples,)
+    task       : "Classification" | "Regression"
+    model_type : one of the strings shown in the UI drop-down
     """
-    
     if task == "Classification":
-        
         if model_type == "Random Forest":
-            model = RandomForestClassifier(random_state=42, n_jobs=-1)
-            param_grid = {
-                "n_estimators": [100, 200],
-                "max_depth": [None, 10, 20],
-                "min_samples_split": [2, 5]
-            }
-            cv_folds = 3
-            
-        else:  # Logistic Regression
-            model = LogisticRegression(max_iter=1000, random_state=42, n_jobs=-1)
-            param_grid = {
-                "C": [0.1, 1, 10],
-                "solver": ['lbfgs', 'liblinear']
-            }
-            cv_folds = 3
+            model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+        elif model_type == "Logistic Regression":
+            model = LogisticRegression(max_iter=1000, random_state=42)
+        elif model_type == "SVM":
+            # probability=True lets us use LinearExplainer / KernelExplainer
+            model = SVC(probability=True, random_state=42)
+        else:
+            raise ValueError(f"Unknown classification model: {model_type}")
 
-    else:  # Regression
-        
+    elif task == "Regression":
         if model_type == "Random Forest":
-            model = RandomForestRegressor(random_state=42, n_jobs=-1)
-            param_grid = {
-                "n_estimators": [100, 200],
-                "max_depth": [None, 10, 20],
-                "min_samples_split": [2, 5]
-            }
-            cv_folds = 3
-            
-        else:  # Linear Regression
+            model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+        elif model_type == "Linear Regression":
             model = LinearRegression()
-            param_grid = {}  # No hyperparameters to tune
-            cv_folds = None
-    
-    # Perform GridSearch if we have parameters to tune
-    if param_grid:
-        # Use fewer folds for small datasets
-        if len(X_train) < 100:
-            cv_folds = 2
-        
-        grid = GridSearchCV(
-            model, 
-            param_grid, 
-            cv=cv_folds, 
-            n_jobs=-1,
-            verbose=0,
-            scoring='accuracy' if task == 'Classification' else 'r2'
-        )
-        grid.fit(X_train, y_train)
-        return grid.best_estimator_
-    
+        elif model_type == "SVR":
+            model = SVR()
+        else:
+            raise ValueError(f"Unknown regression model: {model_type}")
+
     else:
-        model.fit(X_train, y_train)
-        return model
+        raise ValueError(f"Unknown task: {task}")
+
+    model.fit(X_train, y_train)
+    return model
