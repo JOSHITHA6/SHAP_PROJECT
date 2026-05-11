@@ -146,7 +146,7 @@ def global_shap_summary(shap_vals, feature_names, top_n=10):
     """
     mean_abs  = np.abs(shap_vals).mean(axis=0)
     mean_sign = shap_vals.mean(axis=0)
-    top_idx   = np.argsort(mean_abs)[::-1][:top_n]
+    top_idx   = [int(i) for i in np.argsort(mean_abs)[::-1][:top_n]]
     return top_idx, mean_abs, mean_sign
 
 
@@ -440,9 +440,9 @@ elif st.session_state.page == "explanation":
 
             top_n      = min(8, len(feature_names))
             abs_local  = np.abs(local_shap)
-            top_idx_l  = np.argsort(abs_local)[-top_n:]           # smallest→largest for barh
+            top_idx_l  = [int(i) for i in np.argsort(abs_local)[-top_n:]]   # plain Python ints
             top_feats_l   = [feature_names[i] for i in top_idx_l]
-            top_shap_l    = local_shap[top_idx_l]
+            top_shap_l    = np.array([local_shap[i] for i in top_idx_l])
             colors_l      = ['#28a745' if v >= 0 else '#dc3545' for v in top_shap_l]
 
             fig, ax = plt.subplots(figsize=(10, 6))
