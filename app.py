@@ -322,33 +322,23 @@ elif st.session_state.page == "explanation":
         colors = ['#28a745' if s >= 0 else '#dc3545' for s in top_mean_sign]
 
         # ── Chart: signed SHAP bars (left = decreases, right = increases)
-        fig, ax = plt.subplots(figsize=(11, 8))
-        bars = ax.barh(range(len(top_features)), top_mean_sign, color=colors)
+        fig, ax = plt.subplots(figsize=(13, 8))
+        bars = ax.barh(range(len(top_features)), top_mean_sign, color=colors, height=0.6)
         ax.set_yticks(range(len(top_features)))
-        ax.set_yticklabels(top_features, fontsize=11)
-        ax.axvline(0, color='black', linewidth=1.0)   # zero line — same as local chart
+        ax.set_yticklabels(top_features, fontsize=11)  # same as local chart
+        ax.axvline(0, color='black', linewidth=1.2)
         ax.set_xlabel("Mean SHAP Value  (← decreases prediction  |  increases prediction →)", fontsize=11)
-        ax.set_title("Global Feature Importance via SHAP\n(averaged over all test samples)", fontsize=14, fontweight='bold')
+        ax.set_title("Global Feature Importance via SHAP\n(averaged over all test samples)",
+                     fontsize=14, fontweight='bold')
         ax.invert_yaxis()
-
-        # % labels on bars
-        total_abs = sum(top_mean_abs)
-        for bar, sv, ab in zip(bars, top_mean_sign, top_mean_abs):
-            pct   = (ab / total_abs * 100) if total_abs > 0 else 0
-            width = bar.get_width()
-            # place label outside the bar end
-            x_pos = width + (max(top_mean_abs) * 0.02) if width >= 0 else width - (max(top_mean_abs) * 0.02)
-            ha    = 'left' if width >= 0 else 'right'
-            ax.text(x_pos, bar.get_y() + bar.get_height() / 2,
-                    f'{pct:.1f}%', va='center', ha=ha, fontsize=9)
 
         from matplotlib.patches import Patch
         legend_elements = [
-            Patch(facecolor='#28a745', label='Green bar (right side) → INCREASES prediction'),
-            Patch(facecolor='#dc3545', label='Red bar (left side)   → DECREASES prediction'),
+            Patch(facecolor='#28a745', label='Green (right) → INCREASES prediction'),
+            Patch(facecolor='#dc3545', label='Red (left)    → DECREASES prediction'),
         ]
         ax.legend(handles=legend_elements, loc='lower right', fontsize=9)
-        plt.tight_layout()
+        plt.tight_layout()   # same as local — auto-adjusts margins to fit labels
         st.pyplot(fig)
         plt.close()
 
