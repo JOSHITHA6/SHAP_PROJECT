@@ -307,79 +307,100 @@ elif st.session_state.page == "explanation":
 
 
     # ══════════════════════════════════════════
-    # GLOBAL EXPLANATION  (mean |SHAP| values)
+    # GLOBAL EXPLANATION  (mean signed SHAP)
     # ══════════════════════════════════════════
     if exp_type == "🌍 Global Explanation":
         st.subheader("🌍 How Features Impact Predictions (across ALL samples)")
 
         top_idx, mean_abs, mean_sign = global_shap_summary(shap_values, feature_names, top_n=10)
 
-        top_features    = [feature_names[i] for i in top_idx]
-        top_mean_abs    = mean_abs[top_idx]
-        top_mean_sign   = mean_sign[top_idx]
+        top_features  = [feature_names[i] for i in top_idx]
+        top_mean_sign = [float(mean_sign[i]) for i in top_idx]   # signed: +ve or -ve
+        top_mean_abs  = [float(mean_abs[i])  for i in top_idx]   # for % calculation
 
-        # Color by the SIGN of the mean SHAP value
+        # Color: green = increases prediction, red = decreases
         colors = ['#28a745' if s >= 0 else '#dc3545' for s in top_mean_sign]
 
-        fig, ax = plt.subplots(figsize=(10, 8))
-        bars = ax.barh(range(len(top_features)), top_mean_abs, color=colors)
+        # ── Chart: signed SHAP bars (left = decreases, right = increases)
+        fig, ax = plt.subplots(figsize=(11, 8))
+        bars = ax.barh(range(len(top_features)), top_mean_sign, color=colors)
         ax.set_yticks(range(len(top_features)))
-        ax.set_yticklabels(top_features)
-        ax.set_xlabel("Mean |SHAP Value| (average impact on model output)", fontsize=12)
+        ax.set_yticklabels(top_features, fontsize=11)
+        ax.axvline(0, color='black', linewidth=1.0)   # zero line — same as local chart
+        ax.set_xlabel("Mean SHAP Value  (← decreases prediction  |  increases prediction →)", fontsize=11)
         ax.set_title("Global Feature Importance via SHAP\n(averaged over all test samples)", fontsize=14, fontweight='bold')
         ax.invert_yaxis()
 
-        total = top_mean_abs.sum()
-        for bar, imp in zip(bars, top_mean_abs):
+        # % labels on bars
+        total_abs = sum(top_mean_abs)
+        for bar, sv, ab in zip(bars, top_mean_sign, top_mean_abs):
+            pct   = (ab / total_abs * 100) if total_abs > 0 else 0
             width = bar.get_width()
-            pct   = (imp / total) * 100 if total > 0 else 0
-            ax.text(width + width * 0.01, bar.get_y() + bar.get_height() / 2,
-                    f'{pct:.1f}%', va='center', fontsize=9)
+            # place label outside the bar end
+            x_pos = width + (max(top_mean_abs) * 0.02) if width >= 0 else width - (max(top_mean_abs) * 0.02)
+            ha    = 'left' if width >= 0 else 'right'
+            ax.text(x_pos, bar.get_y() + bar.get_height() / 2,
+                    f'{pct:.1f}%', va='center', ha=ha, fontsize=9)
 
         from matplotlib.patches import Patch
         legend_elements = [
-            Patch(facecolor='#28a745', label='🟢 On average INCREASES prediction'),
-            Patch(facecolor='#dc3545', label='🔴 On average DECREASES prediction'),
+            Patch(facecolor='#28a745', label='Green bar (right side) → INCREASES prediction'),
+            Patch(facecolor='#dc3545', label='Red bar (left side)   → DECREASES prediction'),
         ]
-        ax.legend(handles=legend_elements, loc='lower right')
+        ax.legend(handles=legend_elements, loc='lower right', fontsize=9)
         plt.tight_layout()
         st.pyplot(fig)
         plt.close()
 
-        st.markdown('<div class="axis-label">📊 X-axis = Mean |SHAP Value| (average magnitude of impact)</div>', unsafe_allow_html=True)
-        st.markdown('<div class="axis-label">📈 Y-axis = Features ranked by importance</div>', unsafe_allow_html=True)
-        st.markdown('<div class="axis-label">🎨 Green = on average raises the prediction | Red = on average lowers the prediction</div>', unsafe_allow_html=True)
+        st.markdown('<div class="axis-label">📊 <b>X-axis</b> = Mean SHAP Value — bars going <b>RIGHT (green)</b> increase the prediction; bars going <b>LEFT (red)</b> decrease it</div>', unsafe_allow_html=True)
+        st.markdown('<div class="axis-label">📈 <b>Y-axis</b> = Features, ranked by how much they influence the model on average</div>', unsafe_allow_html=True)
+        st.markdown('<div class="axis-label">📌 <b>% label</b> = that feature\'s share of the total influence (all features together = 100%)</div>', unsafe_allow_html=True)
 
         st.markdown("---")
         st.markdown("### 🧠 Why This Behavior?")
-        st.markdown("*Here's what the model learned from your data (averaged across all samples):*")
+        st.markdown("*Here's a full breakdown of how each feature influences the model's predictions on average:*")
 
-        total_abs = mean_abs.sum()
-        for rank, idx in enumerate(top_idx[:5]):
-            idx   = int(idx)
-            feat  = feature_names[idx]
-            pct   = (mean_abs[idx] / total_abs * 100) if total_abs > 0 else 0
-            sign  = mean_sign[idx]
+        total_abs_all = float(mean_abs.sum())
 
-            if sign > 0:
+        for idx in top_idx[:5]:
+            idx      = int(idx)
+            feat     = feature_names[idx]
+            pct      = (float(mean_abs[idx]) / total_abs_all * 100) if total_abs_all > 0 else 0
+            sv       = float(mean_sign[idx])
+            avg_val  = float(X_test.iloc[:, idx].mean())   # average feature value across test set
+
+            if sv > 0:
                 direction_text = "INCREASES the prediction"
+                why = (f"On average across all samples, <b>{feat}</b> has a mean value of <b>{avg_val:.3f}</b>. "
+                       f"The model sees this feature as pushing predictions <b>higher</b> — "
+                       f"meaning samples with a higher <b>{feat}</b> tend to get a higher predicted output.")
                 color = "#28a745"
                 icon  = "📈"
             else:
                 direction_text = "DECREASES the prediction"
+                why = (f"On average across all samples, <b>{feat}</b> has a mean value of <b>{avg_val:.3f}</b>. "
+                       f"The model sees this feature as pushing predictions <b>lower</b> — "
+                       f"meaning samples with a higher <b>{feat}</b> tend to get a lower predicted output.")
                 color = "#dc3545"
                 icon  = "📉"
 
             st.markdown(f"""
 <div class="explanation-box" style="border-left-color: {color};">
 <b>{icon} {feat}</b><br>
-→ <b>Contribution: {pct:.1f}%</b> of total impact<br>
-→ This feature <b style="color:{color};">{direction_text}</b>
+→ <b>📌 Influence Share: {pct:.1f}%</b> &nbsp;— This feature is responsible for <b>{pct:.1f}%</b> of the total influence across all features combined.<br>
+→ <b>📉 SHAP Value: {sv:+.4f}</b> &nbsp;— On average, this feature shifts the model's prediction by <b>{sv:+.4f} units</b> from the baseline.<br>
+→ <b>🎯 Direction: <span style="color:{color};">{direction_text}</span></b><br>
+→ <b>💬 Why?</b> {why}
 </div>
 """, unsafe_allow_html=True)
 
-        st.info("💡 **How to read this:** Contributions are computed using real SHAP values averaged over "
-                "all test samples. Green = on average pushes predictions up, Red = pushes them down.")
+        st.info(
+            "💡 **Reading guide:**\n\n"
+            "**Influence Share %** → How dominant this feature is compared to others. 34% means it drives 34% of all decisions.\n\n"
+            "**SHAP Value** → The actual average amount this feature pushes the prediction up (+) or down (−) from the model's baseline prediction.\n\n"
+            "**Direction** → Whether higher values of this feature increase or decrease the predicted output on average.\n\n"
+            "**Average Value** → The typical value of this feature in your dataset, giving context to the SHAP effect."
+        )
 
 
     # ══════════════════════════════════════════
