@@ -495,8 +495,6 @@ elif st.session_state.page == "explanation":
                 feat  = feature_names[idx]
                 sv    = local_shap[idx]
                 pct   = (abs(sv) / total_abs_l * 100) if total_abs_l > 0 else 0
-                val   = X_single.iloc[0, idx] if idx < len(X_single.columns) else "N/A"
-                val_display = f"{val:.3f}" if isinstance(val, float) else str(val)
 
                 if sv > 0:
                     direction_text = "pushes prediction HIGHER"
@@ -510,7 +508,6 @@ elif st.session_state.page == "explanation":
                 st.markdown(f"""
 <div class="explanation-box" style="border-left-color: {color};">
 <b>{icon} {feat}</b><br>
-→ <b>Value:</b> {val_display}<br>
 → <b>SHAP Contribution: {pct:.1f}%</b> of this row's total impact<br>
 → {direction_text} <span style="color:{color}; font-size:0.85em;">(SHAP = {sv:+.4f})</span>
 </div>
